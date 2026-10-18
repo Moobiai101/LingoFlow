@@ -1,0 +1,11 @@
+{
+  "name": "@lingoflow/contracts",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  }
+}
