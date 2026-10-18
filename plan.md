@@ -5,7 +5,7 @@
 > - Phase 0: **complete** — repository foundation, runtime pin, Docker, offline checks, and project documentation. Commit `08e9eef`.
 > - Phase 1: **complete** — domain contracts, evidence ledger, learner projections, review policy, transfer policy, language capabilities, and roast gates. Commit `4788f5f`.
 > - Phase 2: **complete** — deterministic tutor personas and consent-aware roast composition committed as `45b6ac4`.
-> - Phase 3: **queued** — backend APIs and SQLite persistence.
+> - Phase 3: **complete** — durable Node 24 SQLite repository, validated API routes, webhook/tool auth, idempotency, and persistence tests committed as `61bce4d`.
 > - Phase 4: **provider adapter complete; runtime/session integration pending** — commit `74663b8`.
 > - Phase 5: **UI foundation complete; product-flow integration pending** — commit `dcc26e9`.
 > - Phases 6–10: **queued** — onboarding flow, phrase practice, transfer, hardening, and final validation.
@@ -1147,6 +1147,8 @@ feat add tutor personality and consent-aware roast policy
 
 
 \## Phase 3 — Backend and persistence
+
+> **Status: complete.** Durable SQLite persistence, transactional/idempotent evidence writes, learner/objective/session/phrase/review APIs, normalized provider webhook handling, request metrics, and backend tests are committed as `61bce4d`. Docker could not be run in the worker shell because the `docker` command is unavailable there; this remains an explicit validation gap.
 
 
 
