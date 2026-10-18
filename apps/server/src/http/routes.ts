@@ -163,6 +163,33 @@ export function registerApiRoutes(app: FastifyInstance, options: ApiRouteOptions
     }
   });
 
+  app.post("/api/learners/:id/objectives", async (request, reply) => {
+    try {
+      const { id: learnerId } = params(request);
+      repository.requireLearner(learnerId);
+      const body = asRecord(bodyJson(request.body));
+      const objectiveBody = body.objective === undefined ? body : asRecord(body.objective);
+      const parsed = parseObjective(objectiveBody, learnerId);
+      const objective = repository.createObjective(parsed.input);
+      return reply.code(201).send({ objective });
+    } catch (error) {
+      return sendError(reply, error);
+    }
+  });
+
+  app.post("/api/learners/:id/phrases", async (request, reply) => {
+    try {
+      const { id: learnerId } = params(request);
+      repository.requireLearner(learnerId);
+      const body = asRecord(bodyJson(request.body));
+      const phraseBody = body.phrase === undefined ? body : asRecord(body.phrase);
+      const phrase = repository.upsertPhrase(parsePhrase(phraseBody, learnerId));
+      return reply.code(200).send({ phrase });
+    } catch (error) {
+      return sendError(reply, error);
+    }
+  });
+
   app.post("/api/sessions", async (request, reply) => {
     try {
       const body = asRecord(bodyJson(request.body));

@@ -1,15 +1,19 @@
 \# LingoFlow execution plan
 
-> **Implementation progress — 2026-10-18**
+> **Implementation progress — 2026-10-19**
 >
 > - Phase 0: **complete** — repository foundation, runtime pin, Docker, offline checks, and project documentation. Commit `08e9eef`.
 > - Phase 1: **complete** — domain contracts, evidence ledger, learner projections, review policy, transfer policy, language capabilities, and roast gates. Commit `4788f5f`.
 > - Phase 2: **complete** — deterministic tutor personas and consent-aware roast composition committed as `45b6ac4`.
 > - Phase 3: **complete** — durable Node 24 SQLite repository, validated API routes, webhook/tool auth, idempotency, and persistence tests committed as `61bce4d`.
-> - Phase 4: **provider adapter complete; runtime/session integration pending** — commit `74663b8`.
-> - Phase 5: **UI foundation complete; product-flow integration pending** — commit `dcc26e9`.
-> - Phases 6–10: **queued** — onboarding flow, phrase practice, transfer, hardening, and final validation.
-> - GitHub publication: **complete** — public repository `https://github.com/Moobiai101/LingoFlow`; all local commits through Phase 3 are pushed to `origin/master`.
+> - Phase 4: **runtime integration implemented; live credential smoke test pending** — provider-neutral voice service, signed URL route, phrase replay route, ElevenLabs React client path, safe fallback, and offline tests are in the current working tree.
+> - Phase 5: **complete** — responsive language-studio foundation committed as `dcc26e9`; the application now starts in onboarding when no saved learner exists.
+> - Phase 6: **implemented** — API-first adult Hindi→English onboarding, learner hydration, conversation studio, live voice reconnect states, and text fallback are in the current working tree.
+> - Phase 7: **implemented for honest offline transcript practice** — phrase seeding, `offline_transcript` assessment route, evidence persistence, phrase replay controls, and no-score uncertainty handling are in the current working tree. Microphone-based specialized assessment remains pending.
+> - Phase 8: **implemented** — deterministic review queue refresh, mistake-map projection, and transfer result flow are in the current working tree.
+> - Phases 9–10: **queued** — performance/reliability hardening and final Docker/demo validation.
+> - GitHub publication: **complete through `24eed53`** — public repository `https://github.com/Moobiai101/LingoFlow`; the current Phase 4–8 working tree still needs phase commits and pushes.
+> - Node 24 production smoke: **verified offline** — built `scripts/start.mjs` served `GET /api/health` successfully with Node `24.21.0` and an in-memory database.
 > - Docker verification: **pending in this worker** — the shell currently reports `docker: command not found`; retry before final submission.
 >
 > Living progress notes are maintained at the relevant phase sections below. Every completed working step must pass the offline test command and receive a Git commit.
@@ -1258,7 +1262,7 @@ feat add learner APIs and durable SQLite persistence
 
 \## Phase 4 — ElevenLabs live voice integration
 
-> **Status: adapter foundation complete; runtime integration pending.** Provider-neutral ports, ElevenLabs model configuration, phrase replay caching, normalized events, webhook validation, and offline fakes are committed as `74663b8`.
+> **Status: runtime integration implemented; live credential smoke test pending.** Provider-neutral ports, the server-owned voice session service, signed URL connection route, `eleven_v4` replay route, ElevenLabs React client path, normalized events, webhook validation, safe text fallback, and offline fakes are implemented. The adapter foundation is committed as `74663b8`; the runtime work is awaiting its phase commit.
 
 
 
@@ -1428,7 +1432,7 @@ feat integrate ElevenLabs realtime tutor and phrase replay
 
 \## Phase 5 — Product UI foundation
 
-> **Status: foundation complete; product-flow integration pending.** The responsive language-studio shell, design primitives, connection states, onboarding shell, and fixture-driven studio are committed as `dcc26e9`.
+> **Status: complete.** The responsive language-studio shell, design primitives, connection states, onboarding shell, and fixture-driven studio are committed as `dcc26e9`. The current product-flow work builds on this foundation.
 
 
 
@@ -1612,6 +1616,8 @@ feat establish LingoFlow studio design system
 
 \## Phase 6 — Onboarding and conversation studio
 
+> **Status: implemented; browser permission/live provider smoke test pending.** Adult Hindi→English onboarding persists learner/session state with local fallback, and the studio now calls the server voice route, uses the ElevenLabs React client for signed live sessions, and exposes recoverable text/offline states.
+
 
 
 \### Onboarding flow
@@ -1719,6 +1725,8 @@ feat add onboarding and live conversation studio
 
 
 \## Phase 7 — Phrase cards and pronunciation practice
+
+> **Status: offline transcript slice implemented; microphone assessment pending.** Starter phrases are seeded, practice calls `POST /api/practice/assess`, normalized evidence updates projections, model replay calls the provider route, and uncertain/failed transcript attempts do not receive invented scores. The current drill intentionally does not claim phoneme-level microphone scoring.
 
 
 
@@ -1863,6 +1871,8 @@ feat add phrase cards and evidence-based pronunciation drills
 
 
 \## Phase 8 — Review queue, mistake map, and transfer
+
+> **Status: implemented; final demo validation pending.** Practice and transfer evidence refresh the deterministic review queue and mistake-map projections, while the studio exposes explainable review items and a new-situation transfer task.
 
 
 

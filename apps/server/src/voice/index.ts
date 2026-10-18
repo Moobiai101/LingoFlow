@@ -1,6 +1,7 @@
 import { providers } from "./provider-runtime.js";
 
 export * from "./session-context.js";
+export * from "./session-service.js";
 export * from "./events.js";
 export * from "./phrase-replay.js";
 export * from "./assessment.js";

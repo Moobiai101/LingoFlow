@@ -1,5 +1,6 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
+import { ConversationProvider } from "@elevenlabs/react";
 import { App } from "./routes/App";
 import "./styles.css";
 
@@ -11,6 +12,8 @@ if (!root) {
 
 createRoot(root).render(
   <StrictMode>
-    <App />
+    <ConversationProvider>
+      <App />
+    </ConversationProvider>
   </StrictMode>,
 );

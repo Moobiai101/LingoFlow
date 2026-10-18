@@ -132,6 +132,18 @@ test("review queue output is deterministic and prioritizes repeated errors", asy
   await app.close();
 });
 
+test("an existing learner can hydrate starter objectives and phrases idempotently", async () => {
+  const app = await createTestApp(":memory:");
+  assert.equal((await jsonRequest(app, "POST", "/api/learners", { id: "learner-bootstrap", nativeLanguage: "hi", targetLanguage: "en", isAdult: true })).statusCode, 201);
+  const objective = { id: "objective-bootstrap", title: "Cafe basics", description: "Ask for what you need politely.", skillIds: ["polite questions"] };
+  assert.equal((await jsonRequest(app, "POST", "/api/learners/learner-bootstrap/objectives", objective)).statusCode, 201);
+  const phrase = { id: "phrase-bootstrap", objectiveId: objective.id, skillId: "polite questions", targetText: "Could I have water?", language: "en" };
+  assert.equal((await jsonRequest(app, "POST", "/api/learners/learner-bootstrap/phrases", phrase)).statusCode, 200);
+  assert.equal((await jsonRequest(app, "POST", "/api/learners/learner-bootstrap/phrases", { ...phrase, translation: "क्या मुझे पानी मिल सकता है?" })).statusCode, 200);
+  assert.equal((await app.inject({ method: "GET", url: "/api/phrases/phrase-bootstrap" })).json().phrase.translation, "क्या मुझे पानी मिल सकता है?");
+  await app.close();
+});
+
 test("invalid input and webhook authentication fail closed", async () => {
   const app = await createTestApp(":memory:", { ELEVENLABS_WEBHOOK_SECRET: "webhook-secret", LINGOFLOW_TOOL_SECRET: "tool-secret" });
   const invalid = await jsonRequest(app, "POST", "/api/learners", { nativeLanguage: "hi", isAdult: true });

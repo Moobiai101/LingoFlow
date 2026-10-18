@@ -10,9 +10,12 @@ export type IconName =
   | "arrow-up-right"
   | "book-open"
   | "check"
+  | "cloud-off"
+  | "compass"
   | "chevron-down"
   | "clock"
   | "headphones"
+  | "lock"
   | "mic"
   | "more"
   | "play"
@@ -20,6 +23,7 @@ export type IconName =
   | "spark"
   | "sliders"
   | "sound"
+  | "text-cursor"
   | "waveform";
 
 const iconPaths: Record<IconName, ReactNode> = {
@@ -32,6 +36,8 @@ const iconPaths: Record<IconName, ReactNode> = {
     </>
   ),
   check: <path d="m5 12 4 4L19 6" />,
+  "cloud-off": <path d="m5 5 14 14M5.5 18.5A4.5 4.5 0 0 1 7 9.8 6.5 6.5 0 0 1 19.2 12" />,
+  compass: <><circle cx="12" cy="12" r="8.5" /><path d="m15.5 8.5-2 4-4 2 2-4z" /></>,
   "chevron-down": <path d="m6 9 6 6 6-6" />,
   clock: (
     <>
@@ -45,6 +51,7 @@ const iconPaths: Record<IconName, ReactNode> = {
       <path d="M4 14h3v5H5.5A1.5 1.5 0 0 1 4 17.5zM20 14h-3v5h1.5a1.5 1.5 0 0 0 1.5-1.5z" />
     </>
   ),
+  lock: <><rect x="5" y="10" width="14" height="10" rx="2" /><path d="M8 10V7a4 4 0 0 1 8 0v3" /></>,
   mic: (
     <>
       <rect x="8.5" y="3" width="7" height="11" rx="3.5" />
@@ -73,6 +80,7 @@ const iconPaths: Record<IconName, ReactNode> = {
       <circle cx="15" cy="17" r="2" />
     </>
   ),
+  "text-cursor": <><path d="M6 5h12M6 19h12M9 5v14M15 5v14" /></>,
   sound: (
     <>
       <path d="M4 10v4h3l4 3V7l-4 3z" />

@@ -21,8 +21,10 @@ Copy `.env.example` to `.env` for local configuration. `.env` is ignored by Git.
 | `HOST` | `0.0.0.0` | Fastify bind address. |
 | `PORT` | `3000` | Fastify listen port. |
 | `LINGOFLOW_DB_PATH` | `data/lingoflow.sqlite` | SQLite database path; use `:memory:` for an ephemeral process. |
-| `ELEVENLABS_API_KEY` | unset | Reserved for live provider integration; never commit it. |
+| `ELEVENLABS_API_KEY` | unset | Server-only key for live signed URLs and phrase replay; never commit it. |
 | `ELEVENLABS_AGENT_ID` | unset | Required for live voice session connections. |
+| `ELEVENLABS_VOICE_ID` | unset | Required for live `eleven_v4` phrase replay. |
+| `ELEVENLABS_BASE_URL` | `https://api.elevenlabs.io` | Optional provider base URL for live adapters and local test doubles. |
 | `ELEVENLABS_WEBHOOK_SECRET` | unset | Required to authenticate ElevenLabs webhook deliveries. |
 | `LINGOFLOW_TOOL_SECRET` | unset | Required to authenticate provider tool calls. |
 
@@ -112,7 +114,9 @@ npm start
 
 ## Provider configuration
 
-Offline mode is the default and is sufficient for every test and build. Live mode can configure ElevenLabs Agents for conversation and ElevenLabs TTS for phrase replay; those adapters remain optional so the offline test command stays deterministic.
+Offline mode is the default and is sufficient for every test and build. Live mode can configure ElevenLabs Agents for browser conversation through a server-issued signed URL and ElevenLabs TTS for phrase replay. The browser never receives the API key. The live client path is optional so the offline test command stays deterministic.
+
+The current practice drill is intentionally transcript-only in offline mode. It stores normalized assessment evidence and does not claim microphone or phoneme-level pronunciation precision.
 
 ## Offline demo mode
 
@@ -131,10 +135,15 @@ The initial backend contract includes:
 - `GET /api/learners/:id/summary`
 - `GET /api/learners/:id/review-queue`
 - `GET /api/learners/:id/objectives`
+- `POST /api/learners/:id/objectives`
+- `POST /api/learners/:id/phrases`
 - `POST /api/sessions`
 - `POST /api/evidence`
 - `POST /api/transfer-attempts`
 - `GET /api/phrases/:id`
 - `POST /api/voice/session-context`
+- `POST /api/voice/connect`
+- `POST /api/voice/replay`
+- `POST /api/practice/assess`
 - `POST /api/tools/:toolName` for authenticated, idempotent provider tool calls
 - `POST /api/webhooks/elevenlabs` for HMAC-authenticated normalized ElevenLabs events

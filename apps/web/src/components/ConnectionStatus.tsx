@@ -1,13 +1,18 @@
 import { Button, StatusDot } from "../design-system/primitives";
 
-export type ConnectionState = "connected" | "connecting" | "offline";
+export type ConnectionState = "ready" | "connected" | "connecting" | "offline";
 
 const connectionCopy: Record<
   ConnectionState,
   { label: string; detail: string; tone: "active" | "quiet" | "warm" }
 > = {
+  ready: {
+    label: "Studio ready",
+    detail: "Learner data is synced",
+    tone: "active",
+  },
   connected: {
-    label: "Studio connected",
+    label: "Voice connected",
     detail: "Ready for a live conversation",
     tone: "active",
   },
