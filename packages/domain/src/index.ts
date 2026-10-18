@@ -3,6 +3,7 @@ export * from "./language.js";
 export * from "./review.js";
 export * from "./roast.js";
 export * from "./transfer.js";
+export * from "./tutor-policy.js";
 
 export type {
   CEFRLevel,
