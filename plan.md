@@ -9,6 +9,8 @@
 > - Phase 4: **provider adapter complete; runtime/session integration pending** — commit `74663b8`.
 > - Phase 5: **UI foundation complete; product-flow integration pending** — commit `dcc26e9`.
 > - Phases 6–10: **queued** — onboarding flow, phrase practice, transfer, hardening, and final validation.
+> - GitHub publication: **complete** — public repository `https://github.com/Moobiai101/LingoFlow`; all local commits through Phase 3 are pushed to `origin/master`.
+> - Docker verification: **pending in this worker** — the shell currently reports `docker: command not found`; retry before final submission.
 >
 > Living progress notes are maintained at the relevant phase sections below. Every completed working step must pass the offline test command and receive a Git commit.
 
