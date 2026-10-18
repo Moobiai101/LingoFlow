@@ -1,0 +1,40 @@
+{
+  "name": "lingoflow",
+  "version": "0.1.0",
+  "private": true,
+  "description": "A reproducible foundation for LingoFlow language practice.",
+  "type": "module",
+  "engines": {
+    "node": ">=24.21.0 <25"
+  },
+  "scripts": {
+    "dev": "node scripts/dev.mjs",
+    "dev:web": "vite --config vite.config.ts",
+    "dev:server": "tsx watch apps/server/src/index.ts",
+    "start": "node scripts/start.mjs",
+    "check:env": "node scripts/check-env.mjs",
+    "test": "tsx --test test/**/*.test.ts",
+    "typecheck": "tsc --build tsconfig.json --pretty false --noEmit",
+    "lint": "eslint .",
+    "build": "npm run clean && tsc --build apps/server/tsconfig.json --pretty false && vite build --config vite.config.ts",
+    "clean": "node scripts/clean.mjs"
+  },
+  "dependencies": {
+    "fastify": "5.12.7",
+    "react": "^19.1.1",
+    "react-dom": "^19.1.1"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.38.0",
+    "@types/node": "^24.8.1",
+    "@types/react": "^19.1.16",
+    "@types/react-dom": "^19.1.9",
+    "@vitejs/plugin-react": "^5.0.4",
+    "eslint": "^9.38.0",
+    "globals": "^16.5.0",
+    "tsx": "^4.20.5",
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.46.0",
+    "vite": "^7.1.7"
+  }
+}
