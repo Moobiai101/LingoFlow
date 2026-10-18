@@ -12,7 +12,7 @@
 > - Phase 7: **complete for honest offline transcript practice** — phrase seeding, `offline_transcript` assessment route, evidence persistence, phrase replay controls, and no-score uncertainty handling are committed as `28b21e5`. Microphone-based specialized assessment remains pending.
 > - Phase 8: **complete** — deterministic review queue refresh, mistake-map projection, and transfer result flow are committed as `28b21e5`.
 > - Phases 9–10: **queued** — performance/reliability hardening and final Docker/demo validation.
-> - GitHub publication: **complete through `24eed53`** — public repository `https://github.com/Moobiai101/LingoFlow`; commit `28b21e5` is ready to push.
+> - GitHub publication: **complete through `d299dcc`** — public repository `https://github.com/Moobiai101/LingoFlow`; the voice-learning loop and its progress receipt are pushed to `origin/master`.
 > - Node 24 production smoke: **verified offline** — built `scripts/start.mjs` served `GET /api/health` successfully with Node `24.21.0` and an in-memory database.
 > - Docker verification: **pending in this worker** — the shell currently reports `docker: command not found`; retry before final submission.
 >
