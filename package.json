@@ -13,10 +13,11 @@
     "dev:server": "tsx watch apps/server/src/index.ts",
     "start": "node scripts/start.mjs",
     "check:env": "node scripts/check-env.mjs",
-    "test": "tsx --test test/**/*.test.ts",
-    "typecheck": "tsc --build tsconfig.json --pretty false --noEmit",
+    "prepare:packages": "tsc --build packages/contracts/tsconfig.json packages/domain/tsconfig.json packages/providers/tsconfig.json --pretty false",
+    "test": "npm run prepare:packages && tsx --test test/**/*.test.ts",
+    "typecheck": "npm run prepare:packages && tsc --build tsconfig.json --pretty false --noEmit",
     "lint": "eslint .",
-    "build": "npm run clean && tsc --build apps/server/tsconfig.json --pretty false && vite build --config vite.config.ts",
+    "build": "npm run clean && npm run prepare:packages && tsc --build apps/server/tsconfig.json --pretty false && vite build --config vite.config.ts",
     "clean": "node scripts/clean.mjs"
   },
   "dependencies": {
