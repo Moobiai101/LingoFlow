@@ -343,6 +343,17 @@ button:disabled {
   background: #253029;
 }
 
+.studio-nav__item--static {
+  cursor: default;
+  opacity: 0.82;
+}
+
+.studio-nav__item--static:hover {
+  border-color: transparent;
+  color: #80887d;
+  background: transparent;
+}
+
 .studio-nav__item--active svg {
   color: #acd19f;
 }

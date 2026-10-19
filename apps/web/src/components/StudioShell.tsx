@@ -280,11 +280,9 @@ function connectionState(state: VoiceState): ConnectionState {
 
 export function StudioShell({
   state,
-  onOpenOnboarding,
   onStateChange,
 }: {
   state: LearnerSession;
-  onOpenOnboarding: () => void;
   onStateChange?: (state: LearnerSession) => void;
 }) {
   const [voiceState, setVoiceState] = useState<VoiceState>("offline");
@@ -405,7 +403,7 @@ export function StudioShell({
       <aside className="studio-sidebar">
         <div className="sidebar-heading"><div className="brand-lockup" aria-label="LingoFlow home"><span className="brand-mark">L</span><span>LingoFlow</span></div><button aria-label="Open studio menu" className="icon-button icon-button--subtle" type="button"><Icon name="sliders" size={17} /></button></div>
         <div className="sidebar-profile"><div className="avatar">{initials}</div><div><strong>{state.profile.displayName}&apos;s studio</strong><span>{state.profile.goal === "everyday" ? "Everyday conversation" : state.profile.goal === "work" ? "Work and meetings" : "Travel confidence"}</span></div><Icon name="chevron-down" size={15} /></div>
-        <nav aria-label="Studio navigation" className="studio-nav"><Kicker>Your space</Kicker><button className="studio-nav__item studio-nav__item--active" type="button"><Icon name="waveform" size={18} /><span>Practice studio</span><span className="nav-count">01</span></button><button className="studio-nav__item" onClick={onOpenOnboarding} type="button"><Icon name="spark" size={18} /><span>Practice focus</span></button><button className="studio-nav__item" onClick={() => setPanel("review")} type="button"><Icon name="book-open" size={18} /><span>Review queue</span><span className="nav-count">{state.reviewItems.length.toString().padStart(2, "0")}</span></button></nav>
+        <nav aria-label="Studio navigation" className="studio-nav"><Kicker>Your space</Kicker><button className="studio-nav__item studio-nav__item--active" type="button"><Icon name="waveform" size={18} /><span>Practice studio</span><span className="nav-count">01</span></button><div className="studio-nav__item studio-nav__item--static"><Icon name="spark" size={18} /><span>Practice focus</span><span className="nav-count">{state.skills[0]?.skillId ?? "ready"}</span></div><button className="studio-nav__item" onClick={() => setPanel("review")} type="button"><Icon name="book-open" size={18} /><span>Review queue</span><span className="nav-count">{state.reviewItems.length.toString().padStart(2, "0")}</span></button></nav>
         <div className="sidebar-bottom"><div className="streak-card"><div className="streak-card__copy"><Kicker>Keep the thread</Kicker><strong>3 day streak</strong></div><span className="streak-flame">✦</span></div><ConnectionStatus onReconnect={toggleVoice} state={connectionState(voiceState)} /><p className="sidebar-footer">Built for small, consistent wins.</p></div>
       </aside>
       <section className="studio-main">

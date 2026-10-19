@@ -7,14 +7,15 @@
 > - Phase 2: **complete** — deterministic tutor personas and consent-aware roast composition committed as `45b6ac4`.
 > - Phase 3: **complete** — durable Node 24 SQLite repository, validated API routes, webhook/tool auth, idempotency, and persistence tests committed as `61bce4d`.
 > - Phase 4: **runtime integration complete; live credential smoke test pending** — provider-neutral voice service, signed URL route, phrase replay route, ElevenLabs React client path, safe fallback, and offline tests are committed as `28b21e5`.
-> - Phase 5: **complete** — responsive language-studio foundation committed as `dcc26e9`; the application now starts in onboarding when no saved learner exists.
-> - Phase 6: **complete for the offline/live-ready studio path** — API-first adult Hindi→English onboarding, learner hydration, conversation studio, live voice reconnect states, and text fallback are committed as `28b21e5`.
+> - Phase 5: **complete** — responsive language-studio foundation committed as `dcc26e9`; the application now opens directly into the studio.
+> - Phase 6: **direct-entry studio implemented** — the judge path auto-creates/hydrates an adult Hindi→English demo learner/session, with local fallback, conversation studio, live voice reconnect states, and text fallback.
 > - Phase 7: **complete for honest offline transcript practice** — phrase seeding, `offline_transcript` assessment route, evidence persistence, phrase replay controls, and no-score uncertainty handling are committed as `28b21e5`. Microphone-based specialized assessment remains pending.
 > - Phase 8: **complete** — deterministic review queue refresh, mistake-map projection, and transfer result flow are committed as `28b21e5`.
 > - Phases 9–10: **queued** — performance/reliability hardening and final Docker/demo validation.
 > - GitHub publication: **complete through `d299dcc`** — public repository `https://github.com/Moobiai101/LingoFlow`; the voice-learning loop and its progress receipt are pushed to `origin/master`.
 > - Node 24 production smoke: **verified offline** — built `scripts/start.mjs` served `GET /api/health` successfully with Node `24.21.0` and an in-memory database.
 > - Local development smoke: **verified offline** — `npm run dev` now starts both Fastify and Vite; direct API health, Vite `/api` proxy health, and the browser shell all responded successfully.
+> - Landing flow: **onboarding removed from the judge path** — the app opens directly into the studio and auto-creates/hydrates the demo learner/session; the full loop is available immediately.
 > - Phase 9 reliability slice: **in progress** — live provider calls now have bounded timeouts and retries for transient failures; focused recovery tests and commit are next.
 > - Docker verification: **pending in this worker** — the shell currently reports `docker: command not found`; retry before final submission.
 >
@@ -1618,7 +1619,7 @@ feat establish LingoFlow studio design system
 
 \## Phase 6 — Onboarding and conversation studio
 
-> **Status: implemented in `28b21e5`; browser permission/live provider smoke test pending.** Adult Hindi→English onboarding persists learner/session state with local fallback, and the studio now calls the server voice route, uses the ElevenLabs React client for signed live sessions, and exposes recoverable text/offline states.
+> **Status: direct-entry studio implemented; browser permission/live provider smoke test pending.** The app opens directly into the studio and auto-creates/hydrates an adult Hindi→English demo learner/session with local fallback. The studio calls the server voice route, uses the ElevenLabs React client for signed live sessions, and exposes recoverable text/offline states. The former onboarding component is no longer part of the application route.
 
 
 
