@@ -1,6 +1,8 @@
 name = "lingoflow"
 main = "apps/worker/src/index.ts"
 compatibility_date = "2026-10-19"
+workers_dev = true
+preview_urls = false
 
 [assets]
 directory = "./dist/web"
@@ -17,7 +19,7 @@ LINGOFLOW_PROVIDER_RETRIES = "2"
 [[d1_databases]]
 binding = "DB"
 database_name = "lingoflow"
-database_id = "REPLACE_WITH_D1_DATABASE_ID"
+database_id = "bc17dc3f-f2da-478a-ac08-8e8f19dd64c5"
 migrations_dir = "migrations"
 
 [observability]
