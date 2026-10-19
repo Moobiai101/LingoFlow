@@ -57,6 +57,18 @@ function modeOf(environment: NodeJS.ProcessEnv | undefined): "offline" | "live" 
   return (environment?.LINGOFLOW_MODE ?? process.env.LINGOFLOW_MODE ?? "offline") === "live" ? "live" : "offline";
 }
 
+function boundedEnvironmentNumber(
+  environment: NodeJS.ProcessEnv,
+  key: string,
+  fallback: number,
+  minimum: number,
+  maximum: number,
+): number {
+  const parsed = Number(environment[key]);
+  if (!Number.isFinite(parsed)) return fallback;
+  return Math.max(minimum, Math.min(maximum, Math.round(parsed)));
+}
+
 function errorCode(error: unknown): VoiceFallback["code"] {
   return error instanceof providers.MissingProviderCredentialsError ? "missing_credentials" : "provider_unavailable";
 }
@@ -99,6 +111,8 @@ export class VoiceSessionService {
       agentId: this.environment.ELEVENLABS_AGENT_ID,
       voiceId: this.environment.ELEVENLABS_VOICE_ID,
       baseUrl: this.environment.ELEVENLABS_BASE_URL,
+      timeoutMs: boundedEnvironmentNumber(this.environment, "LINGOFLOW_PROVIDER_TIMEOUT_MS", 12_000, 1, 120_000),
+      maxRetries: boundedEnvironmentNumber(this.environment, "LINGOFLOW_PROVIDER_RETRIES", 2, 0, 5),
     } as const;
     this.provider = this.mode === "live"
       ? new providers.ElevenLabsPhraseReplayProvider(common)

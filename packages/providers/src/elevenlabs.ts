@@ -1,3 +1,4 @@
+import { clearTimeout, setTimeout } from "node:timers";
 import type { JsonValue, NormalizedVoiceEvent } from "../../contracts/dist/index.js";
 import { createPhraseReplayCacheKey, PhraseReplayCache } from "./cache.js";
 import type {
@@ -12,6 +13,9 @@ import type {
 export const ELEVENLABS_AGENT_MODEL = "eleven_flash_v2_5" as const;
 export const ELEVENLABS_PHRASE_MODEL = "eleven_v4" as const;
 export const ELEVENLABS_DEFAULT_BASE_URL = "https://api.elevenlabs.io";
+export const ELEVENLABS_DEFAULT_TIMEOUT_MS = 12_000;
+export const ELEVENLABS_DEFAULT_RETRIES = 2;
+const ELEVENLABS_DEFAULT_RETRY_DELAY_MS = 100;
 
 type FetchLike = typeof fetch;
 
@@ -32,6 +36,12 @@ export interface ElevenLabsOptions {
   readonly fetchImpl?: FetchLike;
   readonly mode?: "offline" | "live";
   readonly cache?: PhraseReplayCache;
+  /** Abort a provider request after this many milliseconds. */
+  readonly timeoutMs?: number;
+  /** Number of retries for network, 408, 429, and 5xx failures. */
+  readonly maxRetries?: number;
+  /** Base delay between retries; exponential backoff is applied. */
+  readonly retryDelayMs?: number;
 }
 
 export class MissingProviderCredentialsError extends Error {
@@ -64,6 +74,63 @@ function requiredLive(options: ElevenLabsOptions, needsAgent: boolean): { apiKey
   ];
   if (missing.length > 0) throw new MissingProviderCredentialsError("ElevenLabs", missing);
   return { apiKey: options.apiKey as string, agentId: options.agentId };
+}
+
+function retryableStatus(status: number): boolean {
+  return status === 408 || status === 429 || status >= 500;
+}
+
+function boundedNumber(value: number | undefined, fallback: number, minimum: number, maximum: number): number {
+  if (value === undefined || !Number.isFinite(value)) return fallback;
+  return Math.max(minimum, Math.min(maximum, Math.round(value)));
+}
+
+function retryDelay(options: ElevenLabsOptions, attempt: number): number {
+  const base = boundedNumber(options.retryDelayMs, ELEVENLABS_DEFAULT_RETRY_DELAY_MS, 0, 5_000);
+  return Math.min(5_000, base * (2 ** attempt));
+}
+
+function wait(milliseconds: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, milliseconds));
+}
+
+/**
+ * Keep provider calls bounded and retry only failures that may recover. The
+ * caller still owns the final error mapping, so provider details never need to
+ * cross the server boundary.
+ */
+async function fetchWithRecovery(
+  options: ElevenLabsOptions,
+  input: string,
+  init: RequestInit,
+): Promise<Response> {
+  const fetchImpl = options.fetchImpl ?? globalThis.fetch;
+  const timeoutMs = boundedNumber(options.timeoutMs, ELEVENLABS_DEFAULT_TIMEOUT_MS, 1, 120_000);
+  const maxRetries = boundedNumber(options.maxRetries, ELEVENLABS_DEFAULT_RETRIES, 0, 5);
+  let lastError: unknown;
+
+  for (let attempt = 0; attempt <= maxRetries; attempt += 1) {
+    const controller = new globalThis.AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+    try {
+      const response = await fetchImpl(input, { ...init, signal: controller.signal });
+      if (!retryableStatus(response.status) || attempt === maxRetries) return response;
+      lastError = new ProviderRequestError(response.status, "transient provider failure");
+      try {
+        await response.body?.cancel();
+      } catch {
+        // Releasing a failed response is best effort; retry policy is unchanged.
+      }
+    } catch (error) {
+      lastError = error;
+      if (attempt === maxRetries) throw error;
+    } finally {
+      clearTimeout(timer);
+    }
+    await wait(retryDelay(options, attempt));
+  }
+
+  throw lastError instanceof Error ? lastError : new Error("ElevenLabs request failed");
 }
 
 function stringValue(value: string | number | undefined): string {
@@ -229,9 +296,8 @@ export class ElevenLabsAgentProvider implements LiveVoiceProvider {
 
   public async connect(input: VoiceSessionContextInput): Promise<VoiceSessionHandle> {
     const credentials = requiredLive(this.options, true);
-    const fetchImpl = this.options.fetchImpl ?? globalThis.fetch;
     const baseUrl = this.options.baseUrl ?? ELEVENLABS_DEFAULT_BASE_URL;
-    const response = await fetchImpl(`${baseUrl}/v1/convai/conversation/get-signed-url?agent_id=${encodeURIComponent(credentials.agentId as string)}`, {
+    const response = await fetchWithRecovery(this.options, `${baseUrl}/v1/convai/conversation/get-signed-url?agent_id=${encodeURIComponent(credentials.agentId as string)}`, {
       method: "GET",
       headers: { "xi-api-key": credentials.apiKey, accept: "application/json" },
     });
@@ -264,9 +330,8 @@ export class ElevenLabsPhraseReplayProvider {
     const cached = this.cache.get(cacheKey);
     if (cached) return cached;
     const credentials = requiredLive(this.options, false);
-    const fetchImpl = this.options.fetchImpl ?? globalThis.fetch;
     const baseUrl = this.options.baseUrl ?? ELEVENLABS_DEFAULT_BASE_URL;
-    const response = await fetchImpl(`${baseUrl}/v1/text-to-speech/${encodeURIComponent(voiceId)}`, {
+    const response = await fetchWithRecovery(this.options, `${baseUrl}/v1/text-to-speech/${encodeURIComponent(voiceId)}`, {
       method: "POST",
       headers: {
         "xi-api-key": credentials.apiKey,

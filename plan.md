@@ -15,6 +15,7 @@
 > - GitHub publication: **complete through `d299dcc`** — public repository `https://github.com/Moobiai101/LingoFlow`; the voice-learning loop and its progress receipt are pushed to `origin/master`.
 > - Node 24 production smoke: **verified offline** — built `scripts/start.mjs` served `GET /api/health` successfully with Node `24.21.0` and an in-memory database.
 > - Local development smoke: **verified offline** — `npm run dev` now starts both Fastify and Vite; direct API health, Vite `/api` proxy health, and the browser shell all responded successfully.
+> - Phase 9 reliability slice: **in progress** — live provider calls now have bounded timeouts and retries for transient failures; focused recovery tests and commit are next.
 > - Docker verification: **pending in this worker** — the shell currently reports `docker: command not found`; retry before final submission.
 >
 > Living progress notes are maintained at the relevant phase sections below. Every completed working step must pass the offline test command and receive a Git commit.
@@ -2002,6 +2003,8 @@ feat add review queue, mistake map, and transfer practice
 
 
 \## Phase 9 — Performance and reliability hardening
+
+> **Status: bounded provider recovery implemented; remaining reliability work pending.** ElevenLabs requests now use configurable timeouts, bounded exponential retries for transient failures, and no retry for permanent 4xx responses. Focused tests cover retry, timeout, and permanent-failure behavior.
 
 
 

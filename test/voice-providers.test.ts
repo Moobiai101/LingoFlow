@@ -3,6 +3,7 @@ import test from "node:test";
 import {
   buildElevenLabsSessionContext,
   buildPhraseReplayCacheKey,
+  ElevenLabsAgentProvider,
   FakeAssessmentProvider,
   FakeVoiceProvider,
   normalizeElevenLabsEvent,
@@ -38,6 +39,62 @@ test("ElevenLabs session context carries compact learner context and flash model
   assert.equal(context.dynamic_variables.top_error_pattern_2, "articles");
   assert.equal(context.conversation_config_override.tts.model_id, "eleven_flash_v2_5");
   assert.match(context.systemPrompt, /roast mode is off/i);
+});
+
+test("ElevenLabs retries transient provider responses before succeeding", async () => {
+  let calls = 0;
+  const provider = new ElevenLabsAgentProvider({
+    mode: "live",
+    apiKey: "api-secret",
+    agentId: "agent-1",
+    maxRetries: 2,
+    retryDelayMs: 0,
+    fetchImpl: async () => {
+      calls += 1;
+      return calls === 1
+        ? new Response("busy", { status: 503 })
+        : new Response(JSON.stringify({ signed_url: "wss://signed.example/session" }), { status: 200 });
+    },
+  });
+  const result = await provider.connect(sessionInput);
+  assert.equal(result.signedUrl, "wss://signed.example/session");
+  assert.equal(calls, 2);
+});
+
+test("ElevenLabs aborts a hung provider request at its timeout", async () => {
+  let aborted = false;
+  const provider = new ElevenLabsAgentProvider({
+    mode: "live",
+    apiKey: "api-secret",
+    agentId: "agent-1",
+    timeoutMs: 5,
+    maxRetries: 0,
+    fetchImpl: async (_input, init) => new Promise<Response>((_resolve, reject) => {
+      init?.signal?.addEventListener("abort", () => {
+        aborted = true;
+        reject(new Error("aborted by test signal"));
+      }, { once: true });
+    }),
+  });
+  await assert.rejects(provider.connect(sessionInput), /aborted by test signal/);
+  assert.equal(aborted, true);
+});
+
+test("ElevenLabs does not retry permanent provider responses", async () => {
+  let calls = 0;
+  const provider = new ElevenLabsAgentProvider({
+    mode: "live",
+    apiKey: "api-secret",
+    agentId: "agent-1",
+    maxRetries: 3,
+    retryDelayMs: 0,
+    fetchImpl: async () => {
+      calls += 1;
+      return new Response("unauthorized", { status: 401 });
+    },
+  });
+  await assert.rejects(provider.connect(sessionInput), /ElevenLabs request failed \(401\)/);
+  assert.equal(calls, 1);
 });
 
 test("ElevenLabs events normalize into internal learner, tutor, and interruption events", () => {

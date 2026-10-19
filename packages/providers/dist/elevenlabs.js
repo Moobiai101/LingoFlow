@@ -1,7 +1,11 @@
+import { clearTimeout, setTimeout } from "node:timers";
 import { createPhraseReplayCacheKey, PhraseReplayCache } from "./cache.js";
 export const ELEVENLABS_AGENT_MODEL = "eleven_flash_v2_5";
 export const ELEVENLABS_PHRASE_MODEL = "eleven_v4";
 export const ELEVENLABS_DEFAULT_BASE_URL = "https://api.elevenlabs.io";
+export const ELEVENLABS_DEFAULT_TIMEOUT_MS = 12_000;
+export const ELEVENLABS_DEFAULT_RETRIES = 2;
+const ELEVENLABS_DEFAULT_RETRY_DELAY_MS = 100;
 export class MissingProviderCredentialsError extends Error {
     code = "MISSING_PROVIDER_CREDENTIALS";
     constructor(provider, fields) {
@@ -29,6 +33,58 @@ function requiredLive(options, needsAgent) {
     if (missing.length > 0)
         throw new MissingProviderCredentialsError("ElevenLabs", missing);
     return { apiKey: options.apiKey, agentId: options.agentId };
+}
+function retryableStatus(status) {
+    return status === 408 || status === 429 || status >= 500;
+}
+function boundedNumber(value, fallback, minimum, maximum) {
+    if (value === undefined || !Number.isFinite(value))
+        return fallback;
+    return Math.max(minimum, Math.min(maximum, Math.round(value)));
+}
+function retryDelay(options, attempt) {
+    const base = boundedNumber(options.retryDelayMs, ELEVENLABS_DEFAULT_RETRY_DELAY_MS, 0, 5_000);
+    return Math.min(5_000, base * (2 ** attempt));
+}
+function wait(milliseconds) {
+    return new Promise((resolve) => setTimeout(resolve, milliseconds));
+}
+/**
+ * Keep provider calls bounded and retry only failures that may recover. The
+ * caller still owns the final error mapping, so provider details never need to
+ * cross the server boundary.
+ */
+async function fetchWithRecovery(options, input, init) {
+    const fetchImpl = options.fetchImpl ?? globalThis.fetch;
+    const timeoutMs = boundedNumber(options.timeoutMs, ELEVENLABS_DEFAULT_TIMEOUT_MS, 1, 120_000);
+    const maxRetries = boundedNumber(options.maxRetries, ELEVENLABS_DEFAULT_RETRIES, 0, 5);
+    let lastError;
+    for (let attempt = 0; attempt <= maxRetries; attempt += 1) {
+        const controller = new globalThis.AbortController();
+        const timer = setTimeout(() => controller.abort(), timeoutMs);
+        try {
+            const response = await fetchImpl(input, { ...init, signal: controller.signal });
+            if (!retryableStatus(response.status) || attempt === maxRetries)
+                return response;
+            lastError = new ProviderRequestError(response.status, "transient provider failure");
+            try {
+                await response.body?.cancel();
+            }
+            catch {
+                // Releasing a failed response is best effort; retry policy is unchanged.
+            }
+        }
+        catch (error) {
+            lastError = error;
+            if (attempt === maxRetries)
+                throw error;
+        }
+        finally {
+            clearTimeout(timer);
+        }
+        await wait(retryDelay(options, attempt));
+    }
+    throw lastError instanceof Error ? lastError : new Error("ElevenLabs request failed");
 }
 function stringValue(value) {
     return value === undefined ? "" : String(value);
@@ -182,9 +238,8 @@ export class ElevenLabsAgentProvider {
     }
     async connect(input) {
         const credentials = requiredLive(this.options, true);
-        const fetchImpl = this.options.fetchImpl ?? globalThis.fetch;
         const baseUrl = this.options.baseUrl ?? ELEVENLABS_DEFAULT_BASE_URL;
-        const response = await fetchImpl(`${baseUrl}/v1/convai/conversation/get-signed-url?agent_id=${encodeURIComponent(credentials.agentId)}`, {
+        const response = await fetchWithRecovery(this.options, `${baseUrl}/v1/convai/conversation/get-signed-url?agent_id=${encodeURIComponent(credentials.agentId)}`, {
             method: "GET",
             headers: { "xi-api-key": credentials.apiKey, accept: "application/json" },
         });
@@ -217,9 +272,8 @@ export class ElevenLabsPhraseReplayProvider {
         if (cached)
             return cached;
         const credentials = requiredLive(this.options, false);
-        const fetchImpl = this.options.fetchImpl ?? globalThis.fetch;
         const baseUrl = this.options.baseUrl ?? ELEVENLABS_DEFAULT_BASE_URL;
-        const response = await fetchImpl(`${baseUrl}/v1/text-to-speech/${encodeURIComponent(voiceId)}`, {
+        const response = await fetchWithRecovery(this.options, `${baseUrl}/v1/text-to-speech/${encodeURIComponent(voiceId)}`, {
             method: "POST",
             headers: {
                 "xi-api-key": credentials.apiKey,

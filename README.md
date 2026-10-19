@@ -25,6 +25,8 @@ Copy `.env.example` to `.env` for local configuration. `.env` is ignored by Git.
 | `ELEVENLABS_AGENT_ID` | unset | Required for live voice session connections. |
 | `ELEVENLABS_VOICE_ID` | unset | Required for live `eleven_v4` phrase replay. |
 | `ELEVENLABS_BASE_URL` | `https://api.elevenlabs.io` | Optional provider base URL for live adapters and local test doubles. |
+| `LINGOFLOW_PROVIDER_TIMEOUT_MS` | `12000` | Per-request live provider timeout, bounded by the server. |
+| `LINGOFLOW_PROVIDER_RETRIES` | `2` | Retries for transient provider/network failures; malformed or permanent 4xx responses are not retried. |
 | `ELEVENLABS_WEBHOOK_SECRET` | unset | Required to authenticate ElevenLabs webhook deliveries. |
 | `LINGOFLOW_TOOL_SECRET` | unset | Required to authenticate provider tool calls. |
 

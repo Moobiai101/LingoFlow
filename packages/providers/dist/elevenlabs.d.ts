@@ -4,6 +4,8 @@ import type { LiveVoiceProvider, PhraseAudio, PhraseReplayRequest, VoiceSessionC
 export declare const ELEVENLABS_AGENT_MODEL: "eleven_flash_v2_5";
 export declare const ELEVENLABS_PHRASE_MODEL: "eleven_v4";
 export declare const ELEVENLABS_DEFAULT_BASE_URL = "https://api.elevenlabs.io";
+export declare const ELEVENLABS_DEFAULT_TIMEOUT_MS = 12000;
+export declare const ELEVENLABS_DEFAULT_RETRIES = 2;
 type FetchLike = typeof fetch;
 export interface ElevenLabsAgentContext extends VoiceSessionContext {
     readonly modelId: typeof ELEVENLABS_AGENT_MODEL;
@@ -27,6 +29,12 @@ export interface ElevenLabsOptions {
     readonly fetchImpl?: FetchLike;
     readonly mode?: "offline" | "live";
     readonly cache?: PhraseReplayCache;
+    /** Abort a provider request after this many milliseconds. */
+    readonly timeoutMs?: number;
+    /** Number of retries for network, 408, 429, and 5xx failures. */
+    readonly maxRetries?: number;
+    /** Base delay between retries; exponential backoff is applied. */
+    readonly retryDelayMs?: number;
 }
 export declare class MissingProviderCredentialsError extends Error {
     readonly code = "MISSING_PROVIDER_CREDENTIALS";
