@@ -37,7 +37,7 @@ The plan incorporates
 
 \- ElevenLabs
 
-&#x20; - Live conversation `eleven\_flash\_v2\_5`
+&#x20; - Live conversation `eleven\_flash\_v2` (the current Agents create API rejects `eleven\_flash\_v2\_5` for English agents)
 
 &#x20; - Phrase replay `eleven\_v4`
 
@@ -97,7 +97,7 @@ Hindi-speaking adult learner
 
 ElevenLabs Agents
 
-&#x20; └── live conversation with eleven\_flash\_v2\_5
+&#x20; └── live conversation with eleven\_flash\_v2
 
 
 
@@ -2257,7 +2257,7 @@ The project is ready when all of these are true
 
 \- Phrase replay works with ElevenLabs `eleven\_v4`.
 
-\- Live conversation works with ElevenLabs `eleven\_flash\_v2\_5`.
+\- Live conversation works with ElevenLabs `eleven\_flash\_v2`.
 
 \- Text fallback works.
 

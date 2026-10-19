@@ -1,6 +1,8 @@
 import { clearTimeout, setTimeout } from "node:timers";
 import { createPhraseReplayCacheKey, PhraseReplayCache } from "./cache.js";
-export const ELEVENLABS_AGENT_MODEL = "eleven_flash_v2_5";
+// The current ElevenLabs Agents create API rejects eleven_flash_v2_5 for
+// English agents, so live conversation uses the accepted flash v2 model.
+export const ELEVENLABS_AGENT_MODEL = "eleven_flash_v2";
 export const ELEVENLABS_PHRASE_MODEL = "eleven_v4";
 export const ELEVENLABS_DEFAULT_BASE_URL = "https://api.elevenlabs.io";
 export const ELEVENLABS_DEFAULT_TIMEOUT_MS = 12_000;

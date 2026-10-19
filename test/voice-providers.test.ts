@@ -34,10 +34,10 @@ const sessionInput = {
 
 test("ElevenLabs session context carries compact learner context and flash model", () => {
   const context = buildElevenLabsSessionContext(sessionInput);
-  assert.equal(context.modelId, "eleven_flash_v2_5");
+  assert.equal(context.modelId, "eleven_flash_v2");
   assert.equal(context.dynamic_variables.target_language, "en");
   assert.equal(context.dynamic_variables.top_error_pattern_2, "articles");
-  assert.equal(context.conversation_config_override.tts.model_id, "eleven_flash_v2_5");
+  assert.equal(context.conversation_config_override.tts.model_id, "eleven_flash_v2");
   assert.match(context.systemPrompt, /roast mode is off/i);
 });
 

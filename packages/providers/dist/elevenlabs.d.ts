@@ -1,7 +1,7 @@
 import type { NormalizedVoiceEvent } from "../../contracts/dist/index.js";
 import { PhraseReplayCache } from "./cache.js";
 import type { LiveVoiceProvider, PhraseAudio, PhraseReplayRequest, VoiceSessionContext, VoiceSessionContextInput, VoiceSessionHandle } from "./ports.js";
-export declare const ELEVENLABS_AGENT_MODEL: "eleven_flash_v2_5";
+export declare const ELEVENLABS_AGENT_MODEL: "eleven_flash_v2";
 export declare const ELEVENLABS_PHRASE_MODEL: "eleven_v4";
 export declare const ELEVENLABS_DEFAULT_BASE_URL = "https://api.elevenlabs.io";
 export declare const ELEVENLABS_DEFAULT_TIMEOUT_MS = 12000;
