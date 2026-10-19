@@ -1,4 +1,6 @@
 import { createRequire } from "node:module";
+import { resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import type FastifyFactory from "fastify";
 import type { FastifyInstance } from "fastify";
 import { registerApiRoutes } from "./http/routes.js";
@@ -76,4 +78,14 @@ export const app = createApp();
 
 export async function start(): Promise<void> {
   await app.listen({ host, port });
+}
+
+// `npm run dev:server` executes this module directly, while production and
+// tests import `start`/`createApp`. Keep both paths explicit so importing the
+// module never opens a listener unexpectedly.
+if (process.argv[1] && fileURLToPath(import.meta.url) === resolve(process.argv[1])) {
+  void start().catch((error: unknown) => {
+    console.error(error);
+    process.exitCode = 1;
+  });
 }

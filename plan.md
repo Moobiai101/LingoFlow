@@ -14,6 +14,7 @@
 > - Phases 9–10: **queued** — performance/reliability hardening and final Docker/demo validation.
 > - GitHub publication: **complete through `d299dcc`** — public repository `https://github.com/Moobiai101/LingoFlow`; the voice-learning loop and its progress receipt are pushed to `origin/master`.
 > - Node 24 production smoke: **verified offline** — built `scripts/start.mjs` served `GET /api/health` successfully with Node `24.21.0` and an in-memory database.
+> - Local development smoke: **verified offline** — `npm run dev` now starts both Fastify and Vite; direct API health, Vite `/api` proxy health, and the browser shell all responded successfully.
 > - Docker verification: **pending in this worker** — the shell currently reports `docker: command not found`; retry before final submission.
 >
 > Living progress notes are maintained at the relevant phase sections below. Every completed working step must pass the offline test command and receive a Git commit.
