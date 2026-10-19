@@ -1,6 +1,6 @@
 import { Button, StatusDot } from "../design-system/primitives";
 
-export type ConnectionState = "ready" | "connected" | "connecting" | "offline";
+export type ConnectionState = "ready" | "connected" | "connecting" | "offline" | "rate_limited";
 
 const connectionCopy: Record<
   ConnectionState,
@@ -25,6 +25,11 @@ const connectionCopy: Record<
     label: "Offline practice",
     detail: "Your local session is ready",
     tone: "quiet",
+  },
+  rate_limited: {
+    label: "Voice rate limited",
+    detail: "Try again in a moment",
+    tone: "warm",
   },
 };
 
@@ -57,7 +62,7 @@ export function ConnectionStatus({
         <strong>{copy.label}</strong>
         <span>{copy.detail}</span>
       </div>
-      {state === "offline" && onReconnect ? (
+      {(state === "offline" || state === "rate_limited") && onReconnect ? (
         <Button aria-label="Try connecting again" onClick={onReconnect} size="sm" variant="ghost">
           Try again
         </Button>

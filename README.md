@@ -120,6 +120,8 @@ Offline mode is the default and is sufficient for every test and build. Live mod
 
 The current practice drill is intentionally transcript-only in offline mode. It stores normalized assessment evidence and does not claim microphone or phoneme-level pronunciation precision.
 
+When the API is temporarily unavailable, evidence, transcript practice, and transfer writes are retained in a bounded browser outbox and retried idempotently on the next successful sync. The outbox contains normalized write payloads only; it never stores raw audio or provider credentials.
+
 ## Offline demo mode
 
 Set `LINGOFLOW_MODE=offline` (the default) and run `npm run dev` or the Docker image. The browser shell displays that offline mode is ready, and `GET /api/health` returns a small JSON status response. No API keys, network requests, or external services are required.

@@ -28,7 +28,7 @@ export interface VoiceConnectRequest {
 }
 
 export interface VoiceFallback {
-  readonly code: "missing_credentials" | "provider_unavailable";
+  readonly code: "missing_credentials" | "provider_unavailable" | "rate_limited";
   readonly message: string;
   readonly mode: "text_fallback";
 }
@@ -70,6 +70,7 @@ function boundedEnvironmentNumber(
 }
 
 function errorCode(error: unknown): VoiceFallback["code"] {
+  if (error instanceof providers.ProviderRequestError && error.status === 429) return "rate_limited";
   return error instanceof providers.MissingProviderCredentialsError ? "missing_credentials" : "provider_unavailable";
 }
 
@@ -78,7 +79,11 @@ function fallbackFor(error: unknown): VoiceFallback {
   return {
     code,
     mode: "text_fallback",
-    message: code === "missing_credentials" ? CREDENTIAL_FALLBACK_MESSAGE : TEXT_FALLBACK_MESSAGE,
+    message: code === "missing_credentials"
+      ? CREDENTIAL_FALLBACK_MESSAGE
+      : code === "rate_limited"
+        ? "Live voice is temporarily rate-limited. Wait a moment, then try again or continue with text practice."
+        : TEXT_FALLBACK_MESSAGE,
   };
 }
 

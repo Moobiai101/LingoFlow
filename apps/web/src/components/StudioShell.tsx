@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import { useConversation } from "@elevenlabs/react";
 import { ConnectionStatus, type ConnectionState } from "./ConnectionStatus";
 import {
@@ -15,7 +15,7 @@ import { Button, Divider, Icon, Kicker, StatusDot } from "../design-system/primi
 
 type Speaker = "coach" | "learner";
 type Panel = "none" | "practice" | "review" | "transfer";
-type VoiceState = "offline" | "connecting" | "connected";
+type VoiceState = "offline" | "connecting" | "connected" | "rate_limited";
 
 type ConversationMessage = {
   readonly id: string;
@@ -31,6 +31,17 @@ const conversationFixture: readonly ConversationMessage[] = [
   { id: "reply", speaker: "learner", label: "You", body: "I finally spoke up in a meeting. I was nervous, but it felt good to share my idea.", time: "10:43", highlighted: "spoke up" },
   { id: "feedback", speaker: "coach", label: "Maya · coach", body: "That sounds like a real win. What helped you feel ready to speak?", time: "10:43" },
 ];
+
+const MAX_VISIBLE_MESSAGES = 120;
+const MAX_SEEN_VOICE_EVENTS = MAX_VISIBLE_MESSAGES * 2;
+
+function clientMessageId(prefix: string): string {
+  return `${prefix}-${globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(36).slice(2)}`}`;
+}
+
+function appendMessage(current: readonly ConversationMessage[], message: ConversationMessage): readonly ConversationMessage[] {
+  return [...current, message].slice(-MAX_VISIBLE_MESSAGES);
+}
 
 function MessageBody({ message }: { message: ConversationMessage }) {
   if (!message.highlighted) return <>{message.body}</>;
@@ -48,6 +59,8 @@ function VoiceButton({ state, onChange }: { state: VoiceState; onChange: () => v
     ? "End voice practice"
     : state === "connecting"
       ? "Connecting voice practice"
+      : state === "rate_limited"
+        ? "Voice is rate limited; try again later"
       : "Connect voice practice";
   return (
     <button
@@ -115,6 +128,7 @@ function ActionDock({
 
 function practiceFeedback(result: PracticeResult): string {
   const feedback = result.feedback?.join(" ");
+  if (result.queued) return feedback ?? "Saved locally. It will sync when the API is available.";
   if (feedback) return result.saved ? feedback : `Not saved yet: ${feedback}`;
   if (result.status === "complete") return "The offline transcript matched the target phrase.";
   if (result.status === "failed") return "No transcript was received.";
@@ -226,13 +240,16 @@ function TransferPanel({ state, onClose, onSaved }: { state: LearnerSession; onC
     const outcome = assessment && typeof assessment === "object" && "outcome" in assessment
       ? String((assessment as { outcome?: unknown }).outcome)
       : undefined;
-    setResult(outcome === "success"
+    const queued = assessment && typeof assessment === "object" && "queued" in assessment;
+    setResult(queued
+      ? "Saved locally. The transfer will sync when the API is available."
+      : outcome === "success"
       ? "Transfer spotted: the polite shape held up in a new situation."
       : assessment
         ? "Saved as an uncertain transfer. Try carrying the polite shape into one more situation."
         : "The transfer could not be saved yet. Reconnect the studio and try again.");
     setIsSubmitting(false);
-    if (assessment) onSaved();
+    if (assessment && !queued) onSaved();
   }
 
   return (
@@ -275,7 +292,10 @@ function SignalRail({
 }
 
 function connectionState(state: VoiceState): ConnectionState {
-  return state === "connected" ? "connected" : state === "connecting" ? "connecting" : "offline";
+  if (state === "connected") return "connected";
+  if (state === "connecting") return "connecting";
+  if (state === "rate_limited") return "rate_limited";
+  return "offline";
 }
 
 export function StudioShell({
@@ -290,6 +310,7 @@ export function StudioShell({
   const [panel, setPanel] = useState<Panel>("none");
   const [activePhraseId, setActivePhraseId] = useState("phrase-could-i");
   const [messages, setMessages] = useState<readonly ConversationMessage[]>(conversationFixture);
+  const seenVoiceEvents = useRef<Set<string>>(new Set());
   const initials = state.profile.displayName.slice(0, 2).toUpperCase() || "LF";
 
   const conversation = useConversation({
@@ -308,9 +329,14 @@ export function StudioShell({
     onMessage: ({ event_id: eventId, message, role, source }) => {
       const speaker: Speaker = role === "user" || source === "user" ? "learner" : "coach";
       const id = `voice-${eventId}-${speaker}`;
-      setMessages((current) => current.some((entry) => entry.id === id)
-        ? current
-        : [...current, { id, speaker, label: speaker === "learner" ? "You" : "Maya · coach", body: message, time: "now" }]);
+      if (seenVoiceEvents.current.has(id)) return;
+      seenVoiceEvents.current.add(id);
+      while (seenVoiceEvents.current.size > MAX_SEEN_VOICE_EVENTS) {
+        const oldest = seenVoiceEvents.current.values().next().value;
+        if (typeof oldest !== "string") break;
+        seenVoiceEvents.current.delete(oldest);
+      }
+      setMessages((current) => appendMessage(current, { id, speaker, label: speaker === "learner" ? "You" : "Maya · coach", body: message, time: "now" }));
       if (speaker === "learner") {
         void postEvidence(state, {
           id: `evidence-voice-${state.sessionId}-${eventId}`,
@@ -328,12 +354,18 @@ export function StudioShell({
       }
     },
   });
+  const conversationStatus = useRef(conversation.status);
 
   useEffect(() => {
+    conversationStatus.current = conversation.status;
     if (conversation.status === "connected") setVoiceState("connected");
     if (conversation.status === "connecting") setVoiceState("connecting");
     if (conversation.status === "error" || conversation.status === "disconnected") setVoiceState("offline");
   }, [conversation.status]);
+
+  useEffect(() => () => {
+    if (conversationStatus.current !== "disconnected") void conversation.endSession();
+  }, [conversation.endSession]);
 
   async function toggleVoice() {
     if (voiceState === "connecting") return;
@@ -348,7 +380,7 @@ export function StudioShell({
     setVoiceNotice("Preparing the conversation line…");
     const result = await connectVoice(state, activePhraseId);
     if (result.mode !== "live" || result.fallback || !result.signedUrl) {
-      setVoiceState("offline");
+      setVoiceState(result.fallbackDetails?.code === "rate_limited" ? "rate_limited" : "offline");
       setVoiceNotice(result.fallbackDetails?.message ?? "Offline text practice is ready. Add live credentials for microphone sessions.");
       return;
     }
@@ -372,7 +404,7 @@ export function StudioShell({
       conversation.sendUserMessage(text);
       return;
     }
-    setMessages((current) => [...current, { id: `reply-${current.length}`, speaker: "learner", label: "You", body: text, time: "now" }]);
+    setMessages((current) => appendMessage(current, { id: clientMessageId("reply"), speaker: "learner", label: "You", body: text, time: "now" }));
     void postEvidence(state, {
       id: `evidence-text-${state.sessionId}-${Date.now()}`,
       itemId: "conversation-small-win",

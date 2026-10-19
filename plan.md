@@ -16,7 +16,7 @@
 > - Node 24 production smoke: **verified offline** — built `scripts/start.mjs` served `GET /api/health` successfully with Node `24.21.0` and an in-memory database.
 > - Local development smoke: **verified offline** — `npm run dev` now starts both Fastify and Vite; direct API health, Vite `/api` proxy health, and the browser shell all responded successfully.
 > - Landing flow: **onboarding removed from the judge path** — the app opens directly into the studio and auto-creates/hydrates the demo learner/session; the full loop is available immediately.
-> - Phase 9 reliability slice: **in progress** — live provider calls now have bounded timeouts and retries for transient failures; focused recovery tests and commit are next.
+> - Phase 9 reliability slice: **implemented for the browser/runtime path** — live provider calls have bounded timeouts/retries, rate limits have a distinct recoverable state, failed evidence/practice/transfer writes use a bounded local outbox, transcript/event memory is capped, and unmount cleanup plus voice event deduplication are explicit.
 > - Docker verification: **pending in this worker** — the shell currently reports `docker: command not found`; retry before final submission.
 >
 > Living progress notes are maintained at the relevant phase sections below. Every completed working step must pass the offline test command and receive a Git commit.
@@ -2005,7 +2005,7 @@ feat add review queue, mistake map, and transfer practice
 
 \## Phase 9 — Performance and reliability hardening
 
-> **Status: bounded provider recovery implemented; remaining reliability work pending.** ElevenLabs requests now use configurable timeouts, bounded exponential retries for transient failures, and no retry for permanent 4xx responses. Focused tests cover retry, timeout, and permanent-failure behavior.
+> **Status: browser/runtime reliability implemented; deployment validation pending.** ElevenLabs requests use configurable timeouts, bounded exponential retries for transient failures, and no retry for permanent 4xx responses. Rate limits map to a specific recoverable UI state. Failed evidence, practice, and transfer writes are retained in a bounded local outbox and flushed idempotently. Visible transcript memory and seen voice events are capped, and session cleanup runs on unmount. Focused tests cover retry, timeout, rate-limit, outbox, and permanent-failure behavior.
 
 
 

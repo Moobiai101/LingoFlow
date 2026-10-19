@@ -1430,6 +1430,7 @@ mark {
 .onboarding-notice svg { flex: 0 0 auto; }
 
 .voice-button--connecting { color: #223128; background: #d5cf9b; animation: listening-pulse 1.3s infinite; }
+.voice-button--rate_limited { color: #3d3021; background: #d5b77f; }
 .message__actions { display: flex; align-items: center; flex-wrap: wrap; gap: .85rem; }
 .message__actions .text-button { margin-top: .72rem; }
 .message__actions .message__signal { margin-right: .1rem; }

@@ -155,3 +155,15 @@ test("live provider failures produce a text fallback response", async () => {
   await app.close();
   repository.close();
 });
+
+test("live rate limits expose a specific recoverable fallback state", async () => {
+  const fetchImpl: typeof fetch = async () => new Response("busy", { status: 429 });
+  const { app, repository } = makeApp({ LINGOFLOW_MODE: "live", ELEVENLABS_API_KEY: "api-secret", ELEVENLABS_AGENT_ID: "agent-1" }, fetchImpl);
+  const response = await app.inject({ method: "POST", url: "/api/voice/connect", payload: connectPayload() });
+  assert.equal(response.statusCode, 200);
+  assert.equal(response.json().status, "text_fallback");
+  assert.equal(response.json().fallbackDetails.code, "rate_limited");
+  assert.match(response.json().fallbackDetails.message, /rate-limited/i);
+  await app.close();
+  repository.close();
+});

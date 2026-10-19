@@ -1,3 +1,5 @@
+import { enqueuePendingWrite, flushPendingWrites, pendingWrite, type OutboxStorage } from "./outbox";
+
 export type ConnectionMode = "connected" | "offline";
 
 export type GoalId = "everyday" | "work" | "travel";
@@ -66,6 +68,7 @@ export type PracticeResult = {
   readonly score?: number;
   readonly feedback?: readonly string[];
   readonly saved: boolean;
+  readonly queued?: boolean;
   readonly duplicate?: boolean;
 };
 
@@ -135,6 +138,15 @@ export const fallbackLearnerSession: LearnerSession = {
 
 function hasWindow(): boolean {
   return typeof window !== "undefined";
+}
+
+function storage(): OutboxStorage | undefined {
+  if (!hasWindow()) return undefined;
+  try {
+    return window.localStorage;
+  } catch {
+    return undefined;
+  }
 }
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
@@ -285,6 +297,7 @@ export async function hydrateSavedLearner(): Promise<LearnerSession | undefined>
   const saved = readLearnerSession();
   if (!saved || !hasWindow()) return saved;
   try {
+    await flushLearnerOutbox(saved);
     const [summary, review] = await Promise.all([
       request<ApiSummaryResponse>(`/api/learners/${saved.learnerId}/summary`),
       request<ApiReviewResponse>(`/api/learners/${saved.learnerId}/review-queue`),
@@ -301,6 +314,7 @@ export async function hydrateSavedLearner(): Promise<LearnerSession | undefined>
 export async function refreshLearnerSession(state: LearnerSession): Promise<LearnerSession> {
   if (!hasWindow()) return state;
   try {
+    await flushLearnerOutbox(state);
     const [summary, review] = await Promise.all([
       request<ApiSummaryResponse>(`/api/learners/${state.learnerId}/summary`),
       request<ApiReviewResponse>(`/api/learners/${state.learnerId}/review-queue`),
@@ -364,6 +378,25 @@ function localPracticeFallback(observed: string): PracticeResult {
   };
 }
 
+async function flushLearnerOutbox(state: LearnerSession): Promise<number> {
+  const target = storage();
+  if (!target) return 0;
+  return flushPendingWrites(target, state.learnerId, state.sessionId, async (entry) => {
+    try {
+      if (entry.kind === "evidence") {
+        await request("/api/evidence", { method: "POST", body: JSON.stringify({ learnerId: state.learnerId, sessionId: state.sessionId, ...entry.payload }) });
+      } else if (entry.kind === "practice") {
+        await request("/api/practice/assess", { method: "POST", body: JSON.stringify({ learnerId: state.learnerId, sessionId: state.sessionId, ...entry.payload }) });
+      } else {
+        await request("/api/transfer-attempts", { method: "POST", body: JSON.stringify({ learnerId: state.learnerId, sessionId: state.sessionId, ...entry.payload }) });
+      }
+      return true;
+    } catch {
+      return false;
+    }
+  });
+}
+
 /** Submit transcript practice and preserve an honest offline fallback. */
 export async function assessPractice(
   state: LearnerSession,
@@ -390,7 +423,21 @@ export async function assessPractice(
     });
     return { ...response, saved: true };
   } catch {
-    return localPracticeFallback(input.observed);
+    const target = storage();
+    if (target) {
+      enqueuePendingWrite(target, pendingWrite("practice", state.learnerId, state.sessionId, {
+        itemId: input.itemId,
+        observed: input.observed,
+        requestId: input.requestId,
+      }));
+    }
+    return {
+      ...localPracticeFallback(input.observed),
+      queued: Boolean(target),
+      feedback: [target
+        ? "Saved locally. The studio will sync this practice attempt when the API is available."
+        : "The local studio could not save this attempt. Try again when the conversation server is available."],
+    };
   }
 }
 
@@ -425,18 +472,29 @@ export async function postEvidence(state: LearnerSession, payload: Record<string
   if (!hasWindow()) return false;
   try {
     await request("/api/evidence", { method: "POST", body: JSON.stringify({ learnerId: state.learnerId, sessionId: state.sessionId, ...payload }) });
+    await flushLearnerOutbox(state);
     return true;
   } catch {
+    const target = storage();
+    if (target) enqueuePendingWrite(target, pendingWrite("evidence", state.learnerId, state.sessionId, payload));
     return false;
   }
 }
 
-export async function postTransfer(state: LearnerSession, payload: Record<string, unknown>): Promise<unknown> {
+export type QueuedWriteResult = { readonly queued: true };
+
+export async function postTransfer(state: LearnerSession, payload: Record<string, unknown>): Promise<unknown | QueuedWriteResult> {
   if (!hasWindow()) return undefined;
   try {
     const result = await request<{ assessment?: unknown }>("/api/transfer-attempts", { method: "POST", body: JSON.stringify({ learnerId: state.learnerId, sessionId: state.sessionId, ...payload }) });
+    await flushLearnerOutbox(state);
     return result.assessment;
   } catch {
+    const target = storage();
+    if (target) {
+      enqueuePendingWrite(target, pendingWrite("transfer", state.learnerId, state.sessionId, payload));
+      return { queued: true };
+    }
     return undefined;
   }
 }
