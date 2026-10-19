@@ -5,8 +5,8 @@ LingoFlow is a focused conversation loop for adult Hindi-speaking learners who a
 ## Architecture
 
 - **Web:** React 19 and Vite provide the minimal browser shell in `apps/web`.
-- **API:** Fastify exposes learner, session, evidence, review, voice-context, tool, and webhook endpoints in `apps/server`.
-- **Persistence:** Node 24's built-in `node:sqlite` stores learners, objectives, phrases, sessions, normalized evidence, and normalized provider events. Schema migrations run on repository startup.
+- **API:** Fastify exposes learner, session, evidence, review, voice-context, tool, and webhook endpoints in `apps/server`; the Cloudflare production adapter in `apps/worker` exposes the browser-facing learning loop on Workers.
+- **Persistence:** Node 24's built-in `node:sqlite` stores local development data; Cloudflare D1 stores production learners, objectives, phrases, sessions, normalized evidence, and normalized provider events. Schema migrations are versioned in `migrations/`.
 - **Runtime:** Node.js `24.21.0` is pinned in `.nvmrc`, the package engine, and the Docker image.
 - **Checks:** TypeScript project references, ESLint, and an offline Node test exercise the API without network calls or provider credentials.
 - **Privacy boundary:** Provider webhooks are authenticated and normalized before storage. Raw provider payloads and raw audio are never stored.
@@ -61,6 +61,52 @@ curl http://localhost:3000/api/health
 ```
 
 The image defaults to offline mode and does not contain a `.env` file or credentials.
+
+## Cloudflare production deployment
+
+The production deployment target is a Cloudflare Worker with a D1 database and
+Worker static assets. The Node/Fastify + SQLite runtime remains available for
+local development and the buildathon Docker check; Cloudflare Workers use the
+native Worker/D1 adapter in `apps/worker` and never depend on a local filesystem
+database.
+
+Create the D1 database once, then put the returned ID into `wrangler.toml`:
+
+```bash
+npx wrangler login
+npx wrangler d1 create lingoflow
+# replace REPLACE_WITH_D1_DATABASE_ID in wrangler.toml
+npm run db:migrate:remote
+npx wrangler secret put ELEVENLABS_API_KEY
+npm run deploy:cloudflare
+```
+
+The Worker configuration keeps the non-secret Agent and voice IDs in
+`wrangler.toml`; only `ELEVENLABS_API_KEY` is a secret. The current live Agent
+uses the supported English `eleven_flash_v2` conversational model and the
+`JBFqnCBsd6RMkjVDRZzb` George voice; phrase replay uses `eleven_v4`.
+
+For local Worker/D1 verification:
+
+```bash
+npm run db:migrate:local
+npm run dev:cloudflare
+```
+
+Copy `.dev.vars.example` to the ignored `.dev.vars` and add the local key if
+you want to exercise live ElevenLabs calls through Wrangler. `npm run
+build:cloudflare` performs a build plus Wrangler dry-run without deploying.
+
+### Persistence and agent memory
+
+Cloudflare D1 is the source of truth for learner/session state, phrases,
+normalized evidence, review projections, and transfer history. Review queues
+and mistake maps are deterministic projections rebuilt from D1 evidence; the
+ElevenLabs agent never owns mastery or progress. Each voice connection receives
+compact dynamic learner context, while the browser caps visible transcript and
+deduplicates provider events. ElevenLabs agent privacy is configured with voice
+recording disabled, audio deletion enabled, and a 30-day provider transcript
+retention window. LingoFlow stores no raw audio.
 
 ## Development run command
 
@@ -128,7 +174,7 @@ Set `LINGOFLOW_MODE=offline` (the default) and run `npm run dev` or the Docker i
 
 ## Privacy and data retention
 
-SQLite stores learner state and normalized learning evidence in UTC timestamps. The API stores no raw audio and does not persist raw provider webhook payloads. The browser shell contains no analytics or tracking.
+SQLite/D1 stores learner state and normalized learning evidence in UTC timestamps. The API stores no raw audio and does not persist raw provider webhook payloads. The browser shell contains no analytics or tracking.
 
 ## API surface
 

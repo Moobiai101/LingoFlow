@@ -6,17 +6,19 @@
 > - Phase 1: **complete** — domain contracts, evidence ledger, learner projections, review policy, transfer policy, language capabilities, and roast gates. Commit `4788f5f`.
 > - Phase 2: **complete** — deterministic tutor personas and consent-aware roast composition committed as `45b6ac4`.
 > - Phase 3: **complete** — durable Node 24 SQLite repository, validated API routes, webhook/tool auth, idempotency, and persistence tests committed as `61bce4d`.
-> - Phase 4: **runtime integration complete; live credential smoke test pending** — provider-neutral voice service, signed URL route, phrase replay route, ElevenLabs React client path, safe fallback, and offline tests are committed as `28b21e5`.
+> - Phase 4: **runtime integration complete; live credential smoke test verified** — provider-neutral voice service, signed URL route, phrase replay route, ElevenLabs React client path, safe fallback, and offline tests are committed as `28b21e5`; live signed URL and `eleven_v4` audio were verified against the configured Agent.
 > - Phase 5: **complete** — responsive language-studio foundation committed as `dcc26e9`; the application now opens directly into the studio.
 > - Phase 6: **direct-entry studio implemented** — the judge path auto-creates/hydrates an adult Hindi→English demo learner/session, with local fallback, conversation studio, live voice reconnect states, and text fallback.
 > - Phase 7: **complete for honest offline transcript practice** — phrase seeding, `offline_transcript` assessment route, evidence persistence, phrase replay controls, and no-score uncertainty handling are committed as `28b21e5`. Microphone-based specialized assessment remains pending.
 > - Phase 8: **complete** — deterministic review queue refresh, mistake-map projection, and transfer result flow are committed as `28b21e5`.
-> - Phases 9–10: **queued** — performance/reliability hardening and final Docker/demo validation.
-> - GitHub publication: **complete through `d299dcc`** — public repository `https://github.com/Moobiai101/LingoFlow`; the voice-learning loop and its progress receipt are pushed to `origin/master`.
+> - Phase 9: **complete for browser/runtime and Cloudflare adapter paths** — bounded provider recovery, local write outbox, rate-limit UI state, capped transcript/event memory, cleanup/deduplication, and D1 Worker deployment path are implemented and locally verified.
+> - Phase 10: **pending final Docker/demo submission checks** — Docker is unavailable in this worker and Cloudflare deployment awaits account authentication/D1 provisioning.
+> - GitHub publication: **complete through the next Cloudflare adapter commit** — public repository `https://github.com/Moobiai101/LingoFlow`; the current branch remains cleanly committed and ready to push.
 > - Node 24 production smoke: **verified offline** — built `scripts/start.mjs` served `GET /api/health` successfully with Node `24.21.0` and an in-memory database.
 > - Local development smoke: **verified offline** — `npm run dev` now starts both Fastify and Vite; direct API health, Vite `/api` proxy health, and the browser shell all responded successfully.
 > - Landing flow: **onboarding removed from the judge path** — the app opens directly into the studio and auto-creates/hydrates the demo learner/session; the full loop is available immediately.
 > - Phase 9 reliability slice: **implemented for the browser/runtime path** — live provider calls have bounded timeouts/retries, rate limits have a distinct recoverable state, failed evidence/practice/transfer writes use a bounded local outbox, transcript/event memory is capped, and unmount cleanup plus voice event deduplication are explicit.
+> - Cloudflare production adapter: **implemented and locally verified** — Worker + D1 routes cover health, learner/session creation, voice fallback/live signed URL, phrase replay, practice assessment, evidence, review refresh, and transfer. `wrangler` dry-run and local D1/Worker smoke checks pass. Remote deployment awaits Cloudflare authentication and a real D1 database ID.
 > - Docker verification: **pending in this worker** — the shell currently reports `docker: command not found`; retry before final submission.
 >
 > Living progress notes are maintained at the relevant phase sections below. Every completed working step must pass the offline test command and receive a Git commit.

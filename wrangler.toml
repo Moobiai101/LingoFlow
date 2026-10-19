@@ -1,0 +1,24 @@
+name = "lingoflow"
+main = "apps/worker/src/index.ts"
+compatibility_date = "2026-10-19"
+
+[assets]
+directory = "./dist/web"
+binding = "ASSETS"
+
+[vars]
+LINGOFLOW_MODE = "live"
+ELEVENLABS_BASE_URL = "https://api.elevenlabs.io"
+ELEVENLABS_AGENT_ID = "agent_6301m5a9tmy2ff288v64c3batzzd"
+ELEVENLABS_VOICE_ID = "JBFqnCBsd6RMkjVDRZzb"
+LINGOFLOW_PROVIDER_TIMEOUT_MS = "12000"
+LINGOFLOW_PROVIDER_RETRIES = "2"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "lingoflow"
+database_id = "REPLACE_WITH_D1_DATABASE_ID"
+migrations_dir = "migrations"
+
+[observability]
+enabled = true

@@ -1,4 +1,3 @@
-import { clearTimeout, setTimeout } from "node:timers";
 import type { JsonValue, NormalizedVoiceEvent } from "../../contracts/dist/index.js";
 import { createPhraseReplayCacheKey, PhraseReplayCache } from "./cache.js";
 import type {
@@ -93,7 +92,7 @@ function retryDelay(options: ElevenLabsOptions, attempt: number): number {
 }
 
 function wait(milliseconds: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, milliseconds));
+  return new Promise((resolve) => globalThis.setTimeout(resolve, milliseconds));
 }
 
 /**
@@ -113,7 +112,7 @@ async function fetchWithRecovery(
 
   for (let attempt = 0; attempt <= maxRetries; attempt += 1) {
     const controller = new globalThis.AbortController();
-    const timer = setTimeout(() => controller.abort(), timeoutMs);
+    const timer = globalThis.setTimeout(() => controller.abort(), timeoutMs);
     try {
       const response = await fetchImpl(input, { ...init, signal: controller.signal });
       if (!retryableStatus(response.status) || attempt === maxRetries) return response;
@@ -127,7 +126,7 @@ async function fetchWithRecovery(
       lastError = error;
       if (attempt === maxRetries) throw error;
     } finally {
-      clearTimeout(timer);
+      globalThis.clearTimeout(timer);
     }
     await wait(retryDelay(options, attempt));
   }

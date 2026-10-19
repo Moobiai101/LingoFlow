@@ -1,4 +1,3 @@
-import { clearTimeout, setTimeout } from "node:timers";
 import { createPhraseReplayCacheKey, PhraseReplayCache } from "./cache.js";
 // The current ElevenLabs Agents create API rejects eleven_flash_v2_5 for
 // English agents, so live conversation uses the accepted flash v2 model.
@@ -49,7 +48,7 @@ function retryDelay(options, attempt) {
     return Math.min(5_000, base * (2 ** attempt));
 }
 function wait(milliseconds) {
-    return new Promise((resolve) => setTimeout(resolve, milliseconds));
+    return new Promise((resolve) => globalThis.setTimeout(resolve, milliseconds));
 }
 /**
  * Keep provider calls bounded and retry only failures that may recover. The
@@ -63,7 +62,7 @@ async function fetchWithRecovery(options, input, init) {
     let lastError;
     for (let attempt = 0; attempt <= maxRetries; attempt += 1) {
         const controller = new globalThis.AbortController();
-        const timer = setTimeout(() => controller.abort(), timeoutMs);
+        const timer = globalThis.setTimeout(() => controller.abort(), timeoutMs);
         try {
             const response = await fetchImpl(input, { ...init, signal: controller.signal });
             if (!retryableStatus(response.status) || attempt === maxRetries)
@@ -82,7 +81,7 @@ async function fetchWithRecovery(options, input, init) {
                 throw error;
         }
         finally {
-            clearTimeout(timer);
+            globalThis.clearTimeout(timer);
         }
         await wait(retryDelay(options, attempt));
     }

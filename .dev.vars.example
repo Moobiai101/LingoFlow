@@ -1,0 +1,9 @@
+# Copy to .dev.vars for local Wrangler development. This file is safe to commit;
+# put real values only in the ignored .dev.vars file.
+LINGOFLOW_MODE=offline
+ELEVENLABS_API_KEY=
+ELEVENLABS_AGENT_ID=agent_6301m5a9tmy2ff288v64c3batzzd
+ELEVENLABS_VOICE_ID=JBFqnCBsd6RMkjVDRZzb
+ELEVENLABS_BASE_URL=https://api.elevenlabs.io
+LINGOFLOW_PROVIDER_TIMEOUT_MS=12000
+LINGOFLOW_PROVIDER_RETRIES=2
