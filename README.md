@@ -182,6 +182,11 @@ npm start
 
 Offline mode is the default and is sufficient for every test and build. Live mode can configure ElevenLabs Agents for browser conversation through a server-issued signed URL and ElevenLabs TTS for phrase replay. The browser never receives the API key. The live client path is optional so the offline test command stays deterministic.
 
+The deployed ElevenLabs Agent owns its prompt configuration. LingoFlow sends
+the learner/session context as supported dynamic variables and deliberately
+does not send a prompt override; the Agent rejects prompt overrides unless
+they are explicitly enabled in its configuration.
+
 The current practice drill is intentionally transcript-only in offline mode. It stores normalized assessment evidence and does not claim microphone or phoneme-level pronunciation precision.
 
 When the API is temporarily unavailable, evidence, transcript practice, and transfer writes are retained in a bounded browser outbox and retried idempotently on the next successful sync. The outbox contains normalized write payloads only; it never stores raw audio or provider credentials.

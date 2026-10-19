@@ -11,6 +11,7 @@ import {
   type LearnerSession,
   type PracticeResult,
 } from "./learner-state";
+import { buildVoiceSessionOptions } from "./voice-session-options";
 import { Button, Divider, Icon, Kicker, StatusDot } from "../design-system/primitives";
 
 type Speaker = "coach" | "learner";
@@ -385,13 +386,11 @@ export function StudioShell({
       return;
     }
 
-    conversation.startSession({
+    conversation.startSession(buildVoiceSessionOptions({
       signedUrl: result.signedUrl,
-      connectionType: "websocket",
-      userId: state.learnerId,
-      ...(result.context?.dynamicVariables ? { dynamicVariables: result.context.dynamicVariables } : {}),
-      ...(result.context?.systemPrompt ? { overrides: { agent: { prompt: { prompt: result.context.systemPrompt } } } } : {}),
-    });
+      learnerId: state.learnerId,
+      dynamicVariables: result.context?.dynamicVariables,
+    }));
     setVoiceNotice("Microphone permission may be requested by your browser.");
   }
 
