@@ -81,6 +81,14 @@ npx wrangler secret put ELEVENLABS_API_KEY
 npm run deploy:cloudflare
 ```
 
+The current public Worker deployment is
+<https://lingoflow.sameerkhanx100.workers.dev>. Verify it after deployment
+with:
+
+```bash
+curl https://lingoflow.sameerkhanx100.workers.dev/api/health
+```
+
 The Worker configuration keeps the non-secret Agent and voice IDs in
 `wrangler.toml`; only `ELEVENLABS_API_KEY` is a secret. The current live Agent
 uses the supported English `eleven_flash_v2` conversational model and the
