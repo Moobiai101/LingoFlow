@@ -6,7 +6,7 @@ LingoFlow is a focused conversation loop for adult Hindi-speaking learners who a
 
 - **Web:** React 19 and Vite provide the minimal browser shell in `apps/web`.
 - **API:** Fastify exposes learner, session, evidence, review, voice-context, tool, and webhook endpoints in `apps/server`; the Cloudflare production adapter in `apps/worker` exposes the browser-facing learning loop on Workers.
-- **Persistence:** Node 24's built-in `node:sqlite` stores local development data; Cloudflare D1 stores production learners, objectives, phrases, sessions, normalized evidence, and normalized provider events. Schema migrations are versioned in `migrations/`.
+- **Persistence:** Node 24's built-in `node:sqlite` stores local development data; Cloudflare D1 stores production learners, objectives, phrases, sessions, and normalized evidence. The D1 migration reserves a `voice_events` table for normalized provider-event ingestion; raw provider payloads are never persisted. Schema migrations are versioned in `migrations/`.
 - **Runtime:** Node.js `24.21.0` is pinned in `.nvmrc`, the package engine, and the Docker image.
 - **Checks:** TypeScript project references, ESLint, and an offline Node test exercise the API without network calls or provider credentials.
 - **Privacy boundary:** Provider webhooks are authenticated and normalized before storage. Raw provider payloads and raw audio are never stored.
@@ -86,6 +86,13 @@ The Worker configuration keeps the non-secret Agent and voice IDs in
 uses the supported English `eleven_flash_v2` conversational model and the
 `JBFqnCBsd6RMkjVDRZzb` George voice; phrase replay uses `eleven_v4`.
 
+The Worker rejects JSON request bodies larger than 256 KiB, returns a request
+correlation ID, and applies browser security headers. Cloudflare native rate
+limit bindings allow up to 120 API requests and 20 voice requests per minute
+per client/path key. The numeric rate-limit namespace IDs in `wrangler.toml`
+must be unique within the Cloudflare account; change them if either ID is
+already in use.
+
 For local Worker/D1 verification:
 
 ```bash
@@ -104,9 +111,12 @@ normalized evidence, review projections, and transfer history. Review queues
 and mistake maps are deterministic projections rebuilt from D1 evidence; the
 ElevenLabs agent never owns mastery or progress. Each voice connection receives
 compact dynamic learner context, while the browser caps visible transcript and
-deduplicates provider events. ElevenLabs agent privacy is configured with voice
-recording disabled, audio deletion enabled, and a 30-day provider transcript
-retention window. LingoFlow stores no raw audio.
+deduplicates provider events. The current Worker stores browser learning-loop
+events as normalized evidence; provider webhook normalization remains on the
+Fastify adapter until a Worker ingestion route is added. ElevenLabs agent
+privacy is configured with voice recording disabled, audio deletion enabled,
+and a 30-day provider transcript retention window. LingoFlow stores no raw
+audio.
 
 ## Development run command
 

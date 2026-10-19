@@ -11,9 +11,9 @@
 > - Phase 6: **direct-entry studio implemented** — the judge path auto-creates/hydrates an adult Hindi→English demo learner/session, with local fallback, conversation studio, live voice reconnect states, and text fallback.
 > - Phase 7: **complete for honest offline transcript practice** — phrase seeding, `offline_transcript` assessment route, evidence persistence, phrase replay controls, and no-score uncertainty handling are committed as `28b21e5`. Microphone-based specialized assessment remains pending.
 > - Phase 8: **complete** — deterministic review queue refresh, mistake-map projection, and transfer result flow are committed as `28b21e5`.
-> - Phase 9: **complete for browser/runtime and Cloudflare adapter paths** — bounded provider recovery, local write outbox, rate-limit UI state, capped transcript/event memory, cleanup/deduplication, and D1 Worker deployment path are implemented and locally verified.
+> - Phase 9: **complete for browser/runtime and Cloudflare adapter paths** — bounded provider recovery, local write outbox, rate-limit UI state, capped transcript/event memory, cleanup/deduplication, D1 Worker deployment path, request-size limits, correlation IDs, security headers, and native Cloudflare API/voice rate-limit bindings are implemented and locally verified.
 > - Phase 10: **pending final Docker/demo submission checks** — Docker is unavailable in this worker and Cloudflare deployment awaits account authentication/D1 provisioning.
-> - GitHub publication: **complete through `bd234bd`** — public repository `https://github.com/Moobiai101/LingoFlow`; local `master` matches `origin/master`.
+> - GitHub publication: **complete through `4de771d`** — public repository `https://github.com/Moobiai101/LingoFlow`; local `master` matches `origin/master`.
 > - Node 24 production smoke: **verified offline** — built `scripts/start.mjs` served `GET /api/health` successfully with Node `24.21.0` and an in-memory database.
 > - Local development smoke: **verified offline** — `npm run dev` now starts both Fastify and Vite; direct API health, Vite `/api` proxy health, and the browser shell all responded successfully.
 > - Landing flow: **onboarding removed from the judge path** — the app opens directly into the studio and auto-creates/hydrates the demo learner/session; the full loop is available immediately.

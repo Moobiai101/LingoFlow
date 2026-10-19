@@ -7,6 +7,17 @@ export class WorkerInputError extends Error {
   }
 }
 
+export class WorkerPayloadTooLargeError extends Error {
+  public readonly code = "PAYLOAD_TOO_LARGE";
+
+  public constructor() {
+    super("Request body is too large");
+    this.name = "WorkerPayloadTooLargeError";
+  }
+}
+
+export const MAX_REQUEST_BODY_BYTES = 256 * 1024;
+
 export type JsonRecord = Record<string, unknown>;
 
 export function asRecord(value: unknown): JsonRecord {
@@ -86,9 +97,46 @@ export function stringArray(record: JsonRecord, key: string): readonly string[] 
 }
 
 export async function bodyRecord(request: Request): Promise<JsonRecord> {
+  const contentLength = request.headers.get("content-length");
+  if (contentLength !== null) {
+    const declaredLength = Number(contentLength);
+    if (Number.isFinite(declaredLength) && declaredLength > MAX_REQUEST_BODY_BYTES) {
+      throw new WorkerPayloadTooLargeError();
+    }
+  }
+
+  let bodyText = "";
+  try {
+    if (!request.body) {
+      bodyText = await request.text();
+    } else {
+      const reader = request.body.getReader();
+      const decoder = new TextDecoder();
+      let totalBytes = 0;
+      try {
+        while (true) {
+          const chunk = await reader.read();
+          if (chunk.done) break;
+          totalBytes += chunk.value.byteLength;
+          if (totalBytes > MAX_REQUEST_BODY_BYTES) {
+            await reader.cancel();
+            throw new WorkerPayloadTooLargeError();
+          }
+          bodyText += decoder.decode(chunk.value, { stream: true });
+        }
+        bodyText += decoder.decode();
+      } finally {
+        reader.releaseLock();
+      }
+    }
+  } catch (error) {
+    if (error instanceof WorkerPayloadTooLargeError) throw error;
+    if (bodyText.length > MAX_REQUEST_BODY_BYTES) throw new WorkerPayloadTooLargeError();
+    throw new WorkerInputError("Request body could not be read");
+  }
   let value: unknown;
   try {
-    value = await request.json();
+    value = JSON.parse(bodyText) as unknown;
   } catch {
     throw new WorkerInputError("Request body must be valid JSON");
   }

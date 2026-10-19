@@ -24,6 +24,7 @@ import {
   requiredString,
   stringArray,
   WorkerInputError,
+  WorkerPayloadTooLargeError,
   type JsonRecord,
 } from "./validation.js";
 
@@ -33,6 +34,19 @@ const SOURCES = ["conversation", "assessment", "review", "transfer", "system", "
 const SESSION_STATUSES = ["active", "completed", "cancelled"] as const;
 const OBJECTIVE_STATUSES = ["active", "completed", "paused"] as const;
 const PRACTICE_MODE = "offline_transcript" as const;
+const VOICE_LIMITED_PATHS = new Set([
+  "/api/voice/session-context",
+  "/api/voice/connect",
+  "/api/voice/replay",
+]);
+const SECURITY_HEADERS = {
+  "x-content-type-options": "nosniff",
+  "referrer-policy": "same-origin",
+  "permissions-policy": "microphone=(self)",
+  "x-frame-options": "DENY",
+  "cross-origin-opener-policy": "same-origin",
+  "cross-origin-resource-policy": "same-origin",
+} as const;
 
 function now(): string {
   return new Date().toISOString();
@@ -72,8 +86,7 @@ function headers(contentType = "application/json; charset=utf-8"): Headers {
   return new Headers({
     "content-type": contentType,
     "cache-control": "no-store",
-    "x-content-type-options": "nosniff",
-    "referrer-policy": "same-origin",
+    ...SECURITY_HEADERS,
   });
 }
 
@@ -84,10 +97,47 @@ function jsonResponse(value: unknown, status = 200, extra?: HeadersInit): Respon
 }
 
 function errorResponse(error: unknown): Response {
+  if (error instanceof WorkerPayloadTooLargeError) return jsonResponse({ error: error.code, message: error.message }, 413);
   if (error instanceof WorkerInputError) return jsonResponse({ error: error.code, message: error.message }, 400);
   if (error instanceof WorkerNotFoundError) return jsonResponse({ error: error.code, message: error.message }, 404);
   if (error instanceof WorkerConflictError) return jsonResponse({ error: error.code, message: error.message }, 409);
   return jsonResponse({ error: "INTERNAL_ERROR", message: "The request could not be completed" }, 500);
+}
+
+function requestIdFor(request: Request): string {
+  const candidate = request.headers.get("x-request-id")?.trim();
+  return candidate && /^[A-Za-z0-9._:-]{1,128}$/.test(candidate) ? candidate : crypto.randomUUID();
+}
+
+function withResponseHeaders(response: Response, requestId: string): Response {
+  const responseHeaders = new Headers(response.headers);
+  for (const [key, value] of Object.entries(SECURITY_HEADERS)) responseHeaders.set(key, value);
+  responseHeaders.set("x-request-id", requestId);
+  return new Response(response.body, { status: response.status, statusText: response.statusText, headers: responseHeaders });
+}
+
+function rateLimitKey(request: Request, path: string): string {
+  const clientAddress = request.headers.get("cf-connecting-ip")?.trim() || "unknown-client";
+  return `${clientAddress}:${path}`;
+}
+
+async function rateLimitResponse(request: Request, env: Env): Promise<Response | undefined> {
+  const path = routePath(request);
+  if (request.method === "OPTIONS" || request.method === "GET" || path === "/api/health" || !path.startsWith("/api/")) return undefined;
+  const limiter = VOICE_LIMITED_PATHS.has(path) ? env.VOICE_LIMITER ?? env.API_LIMITER : env.API_LIMITER;
+  if (!limiter) return undefined;
+  const outcome = await limiter.limit({ key: rateLimitKey(request, path) });
+  if (outcome.success) return undefined;
+  return jsonResponse(
+    {
+      error: "RATE_LIMITED",
+      message: VOICE_LIMITED_PATHS.has(path)
+        ? "Voice requests are temporarily rate-limited. Continue with text practice or try again shortly."
+        : "Requests are temporarily rate-limited. Try again shortly.",
+    },
+    429,
+    { "retry-after": "60" },
+  );
 }
 
 function idOrRandom(body: JsonRecord, key = "id"): string {
@@ -394,7 +444,7 @@ async function appendTransfer(request: Request, env: Env): Promise<Response> {
 async function handleApi(request: Request, env: Env, ctx: ExecutionContext): Promise<Response | undefined> {
   const path = routePath(request);
   if (!path.startsWith("/api/")) return undefined;
-  if (request.method === "OPTIONS") return new Response(null, { status: 204, headers: headers() });
+  if (request.method === "OPTIONS") return new Response(null, { status: 204, headers: new Headers({ ...Object.fromEntries(headers()), allow: "GET, POST, OPTIONS" }) });
   if (request.method === "GET" && path === "/api/health") return jsonResponse({ status: "ok", mode: mode(env), persistence: "cloudflare-d1" });
   if (request.method === "POST" && path === "/api/voice/session-context") return voiceSessionContext(request, env);
   if (request.method === "POST" && path === "/api/voice/connect") return connectVoice(request, env);
@@ -464,12 +514,15 @@ async function handleApi(request: Request, env: Env, ctx: ExecutionContext): Pro
 
 const handler: ExportedHandler<Env> = {
   async fetch(request, env, ctx) {
+    const requestId = requestIdFor(request);
     try {
+      const limited = await rateLimitResponse(request, env);
+      if (limited) return withResponseHeaders(limited, requestId);
       const api = await handleApi(request, env, ctx);
-      if (api) return api;
-      return env.ASSETS.fetch(request);
+      if (api) return withResponseHeaders(api, requestId);
+      return withResponseHeaders(await env.ASSETS.fetch(request), requestId);
     } catch (error) {
-      return errorResponse(error);
+      return withResponseHeaders(errorResponse(error), requestId);
     }
   },
 };
