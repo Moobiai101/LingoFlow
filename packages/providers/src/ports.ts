@@ -57,6 +57,9 @@ export interface AssessmentProvider {
 }
 
 export interface VoiceSessionHandle {
+  /** Short-lived ElevenLabs WebRTC conversation authorization token. */
+  readonly conversationToken?: string;
+  /** Legacy browser authorization value retained for older clients. */
   readonly signedUrl?: string;
   readonly context: VoiceSessionContext;
 }

@@ -1,9 +1,7 @@
-import { useEffect, useRef, useState, type FormEvent } from "react";
-import { useConversation } from "@elevenlabs/react";
+import { useState, type FormEvent } from "react";
 import { ConnectionStatus, type ConnectionState } from "./ConnectionStatus";
 import {
   assessPractice,
-  connectVoice,
   postEvidence,
   postTransfer,
   refreshLearnerSession,
@@ -11,12 +9,12 @@ import {
   type LearnerSession,
   type PracticeResult,
 } from "./learner-state";
-import { buildVoiceSessionOptions } from "./voice-session-options";
-import { Button, Divider, Icon, Kicker, StatusDot } from "../design-system/primitives";
+import { useLiveVoice, type LiveVoiceMessage, type LiveVoicePhase } from "./live-voice";
+import { TutorCharacter, type TutorCharacterState } from "./TutorCharacter";
+import { Button, Icon, Kicker, StatusDot } from "../design-system/primitives";
 
 type Speaker = "coach" | "learner";
 type Panel = "none" | "practice" | "review" | "transfer";
-type VoiceState = "offline" | "connecting" | "connected" | "rate_limited";
 
 type ConversationMessage = {
   readonly id: string;
@@ -34,7 +32,6 @@ const conversationFixture: readonly ConversationMessage[] = [
 ];
 
 const MAX_VISIBLE_MESSAGES = 120;
-const MAX_SEEN_VOICE_EVENTS = MAX_VISIBLE_MESSAGES * 2;
 
 function clientMessageId(prefix: string): string {
   return `${prefix}-${globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(36).slice(2)}`}`;
@@ -55,75 +52,164 @@ function phraseTextFor(itemId: string): string {
   return "Could I have water?";
 }
 
-function VoiceButton({ state, onChange }: { state: VoiceState; onChange: () => void }) {
-  const label = state === "connected"
+function phraseTranslationFor(itemId: string): string {
+  if (itemId === "phrase-because") return "क्योंकि";
+  return "क्या मुझे पानी मिल सकता है?";
+}
+
+function VoiceButton({ phase, onChange }: { phase: LiveVoicePhase; onChange: () => void }) {
+  const label = phase === "connected"
     ? "End voice practice"
-    : state === "connecting"
+    : phase === "connecting"
       ? "Connecting voice practice"
-      : state === "rate_limited"
-        ? "Voice is rate limited; try again later"
-      : "Connect voice practice";
+      : phase === "ending"
+        ? "Ending voice practice"
+        : phase === "text_fallback"
+          ? "Try live voice again"
+          : "Start voice practice";
+  const isBusy = phase === "connecting" || phase === "ending";
   return (
     <button
       aria-label={label}
-      aria-pressed={state === "connected"}
-      className={`voice-button ${state === "connecting" ? "voice-button--connecting" : ""} ${state === "connected" ? "voice-button--listening" : ""}`}
-      disabled={state === "connecting"}
+      aria-pressed={phase === "connected"}
+      className={`voice-button voice-button--${phase}`}
+      disabled={isBusy}
       onClick={onChange}
       type="button"
     >
-      <Icon name="mic" size={21} />
+      <span className="voice-button__ring" aria-hidden="true" />
+      <Icon name="mic" size={27} />
+      <span className="sr-only">{phase === "connected" ? "End voice practice" : "Start voice practice"}</span>
     </button>
   );
 }
 
-function ActionDock({
-  state,
-  hint,
+function voiceCopy(phase: LiveVoicePhase, isSpeaking: boolean, isListening: boolean): { title: string; detail: string } {
+  if (phase === "connecting") return { title: "Finding your conversation line", detail: "Microphone permission may appear next." };
+  if (phase === "ending") return { title: "Closing the conversation", detail: "Your notes stay safe in this studio." };
+  if (phase === "text_fallback") return { title: "Text practice is ready", detail: "Live voice is taking a pause. You can keep going here." };
+  if (phase === "connected" && isSpeaking) return { title: "Maya is speaking", detail: "Listen for one small, useful phrase." };
+  if (phase === "connected" && isListening) return { title: "Maya is listening", detail: "Take your time. There is no rush." };
+  if (phase === "connected") return { title: "Your turn", detail: "Say it in your own words." };
+  return { title: "Ready when you are", detail: "Start a gentle five-minute voice practice." };
+}
+
+function VoiceControls({
+  phase,
+  notice,
+  isSpeaking,
+  isListening,
   onVoiceChange,
+  onEnd,
   onReplay,
   onReply,
 }: {
-  state: VoiceState;
-  hint?: string;
+  phase: LiveVoicePhase;
+  notice?: string;
+  isSpeaking: boolean;
+  isListening: boolean;
   onVoiceChange: () => void;
+  onEnd: () => void;
   onReplay: () => void;
   onReply: (text: string) => void;
 }) {
   const [draft, setDraft] = useState("");
+  const copy = voiceCopy(phase, isSpeaking, isListening);
+  const isOpen = phase === "connected" || phase === "connecting" || phase === "ending";
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!draft.trim()) return;
-    onReply(draft.trim());
+    const text = draft.trim();
+    if (!text) return;
+    onReply(text);
     setDraft("");
   }
 
   return (
-    <div className="action-dock-wrap">
-      <form className="action-dock" onSubmit={handleSubmit}>
-        <VoiceButton onChange={onVoiceChange} state={state} />
-        <label className="sr-only" htmlFor="practice-note">Write a reply</label>
-        <input
-          id="practice-note"
-          onChange={(event) => setDraft(event.target.value)}
-          placeholder={state === "connected" ? "Voice is ready, or write a reply…" : "Write what you would say…"}
-          value={draft}
-        />
-        <div className="action-dock__actions">
-          <button aria-label="Play latest coach message" className="dock-icon-button" onClick={onReplay} type="button">
-            <Icon name="play" size={16} />
+    <section aria-labelledby="voice-controls-title" className={`voice-controls voice-controls--${phase}`}>
+      <div className="voice-controls__heading">
+        <div>
+          <Kicker>Conversation line</Kicker>
+          <h2 id="voice-controls-title">{copy.title}</h2>
+          <p>{copy.detail}</p>
+        </div>
+        <span className={`voice-state-chip voice-state-chip--${phase}`} role="status">
+          <StatusDot tone={phase === "connected" ? "active" : phase === "text_fallback" ? "warm" : "quiet"} />
+          {phase === "connected" ? "Live" : phase === "text_fallback" ? "Text only" : phase === "connecting" || phase === "ending" ? "Working" : "Idle"}
+        </span>
+      </div>
+      <div className="voice-controls__actions">
+        <VoiceButton onChange={onVoiceChange} phase={phase} />
+        {isOpen ? (
+          <button aria-label="End voice session" className="voice-end-button" disabled={phase === "ending"} onClick={onEnd} type="button">
+            <span className="voice-end-button__dot" aria-hidden="true" />
+            {phase === "ending" ? "Ending" : "End session"}
           </button>
-          <button aria-label="Send written reply" className="send-button" disabled={!draft.trim()} type="submit">
+        ) : null}
+        <button aria-label="Hear the focus phrase" className="voice-replay-button" onClick={onReplay} type="button">
+          <Icon name="play" size={16} />
+          <span>Hear phrase</span>
+        </button>
+      </div>
+      <form aria-label="Text fallback" className="text-fallback" onSubmit={handleSubmit}>
+        <label htmlFor="practice-note">Prefer typing?</label>
+        <div className="text-fallback__input">
+          <input
+            id="practice-note"
+            onChange={(event) => setDraft(event.target.value)}
+            placeholder={phase === "connected" ? "You can also type a reply…" : "Write what you would say…"}
+            value={draft}
+          />
+          <button aria-label="Send written reply" disabled={!draft.trim()} type="submit">
             <Icon name="arrow-up-right" size={17} />
           </button>
         </div>
       </form>
-      <p className="action-dock__hint">
-        <Icon name="headphones" size={14} />
-        {hint ?? (state === "connected" ? "Live voice connected. End or reconnect any time." : "Voice is optional. Offline transcript practice stays text-only.")}
+      <p aria-live="polite" className="voice-controls__notice">
+        <Icon name={phase === "text_fallback" ? "cloud-off" : "headphones"} size={14} />
+        {notice || (phase === "connected" ? "Microphone is on. End or reconnect any time." : "Voice is optional. Text practice works offline.")}
       </p>
-    </div>
+    </section>
+  );
+}
+
+function LiveTranscript({
+  messages,
+  phase,
+  isListening,
+  initials,
+}: {
+  messages: readonly ConversationMessage[];
+  phase: LiveVoicePhase;
+  isListening: boolean;
+  initials: string;
+}) {
+  const visibleMessages = messages.slice(-4);
+  return (
+    <section aria-labelledby="live-transcript-title" className="live-transcript">
+      <div className="live-transcript__heading">
+        <div>
+          <Kicker>Live transcript</Kicker>
+          <h2 id="live-transcript-title">A few words at a time.</h2>
+        </div>
+        <span className="transcript-count">{messages.length.toString().padStart(2, "0")} turns</span>
+      </div>
+      <div aria-live="polite" className="transcript-feed">
+        {visibleMessages.map((message) => (
+          <article className={`transcript-line transcript-line--${message.speaker}`} key={message.id}>
+            <span aria-hidden="true" className="transcript-line__avatar">{message.speaker === "coach" ? "M" : initials}</span>
+            <div className="transcript-line__body">
+              <div className="transcript-line__meta"><span>{message.label}</span><time>{message.time}</time></div>
+              <p><MessageBody message={message} /></p>
+            </div>
+          </article>
+        ))}
+      </div>
+      <p aria-live="polite" className="transcript-listening" role="status">
+        <span className={`transcript-listening__dot ${isListening ? "transcript-listening__dot--active" : ""}`} aria-hidden="true" />
+        {phase === "connected" && isListening ? "Listening for your next thought" : phase === "connected" ? "Your conversation is live" : "Your transcript will appear here"}
+      </p>
+    </section>
   );
 }
 
@@ -269,34 +355,62 @@ function TransferPanel({ state, onClose, onSaved }: { state: LearnerSession; onC
   );
 }
 
-function SignalRail({
+function PracticeRail({
   state,
+  activePhraseId,
   onPanel,
   onPractice,
+  onReplay,
 }: {
   state: LearnerSession;
+  activePhraseId: string;
   onPanel: (panel: Panel) => void;
   onPractice: (itemId: string) => void;
+  onReplay: () => void;
 }) {
   const topSkill = state.skills[0];
-  const topPhraseId = topSkill?.skillId === "connecting ideas" ? "phrase-because" : "phrase-could-i";
   return (
-    <aside aria-label="Conversation signals" className="signal-rail">
-      <div className="signal-rail__heading"><div><Kicker>Signal rail</Kicker><h2>Stay curious</h2></div><button aria-label="Signal rail options" className="icon-button" type="button"><Icon name="more" /></button></div>
-      <section className="signal-card signal-card--warm"><div className="signal-card__topline"><span className="signal-card__label"><StatusDot tone="warm" /> Try this</span><span className="signal-card__index">01</span></div><h3>{topSkill ? `Give your ${topSkill.skillId} a little more room.` : "Give your idea a little more room."}</h3><p>Use <strong>because</strong> to connect your thought to a reason.</p><button className="text-button" onClick={() => onPractice(topPhraseId)} type="button">Practice this <Icon name="arrow-up-right" size={15} /></button></section>
-      <section aria-labelledby="mistake-map-title" className="mistake-map"><div className="signal-card__topline"><span className="phrase-card__label"><Icon name="waveform" size={15} /> Mistake map</span><span className="coming-soon">Live view</span></div><h3 id="mistake-map-title">Where to spend a minute</h3><div className="skill-bars">{state.skills.slice(0, 3).map((skill) => <div className="skill-bar" key={skill.skillId}><div><span>{skill.skillId}</span><small>{skill.errorCount ? `${skill.errorCount} signal${skill.errorCount === 1 ? "" : "s"}` : "steady"}</small></div><span className="skill-bar__track"><span style={{ width: `${Math.min(100, Math.max(14, skill.priorityScore * 18))}%` }} /></span></div>)}</div><p>Patterns, not grades. The map only shows what to revisit next.</p></section>
-      <section className="phrase-card"><div className="phrase-card__topline"><span className="phrase-card__label"><Icon name="book-open" size={15} /> Review queue</span><span className="queue-count">{state.reviewItems.length.toString().padStart(2, "0")}</span></div><h3>{state.reviewItems.length ? `${state.reviewItems.length} small loop${state.reviewItems.length === 1 ? "" : "s"} ready.` : "Your queue is clear."}</h3><p>Return to the phrases that deserve another gentle try.</p><button className="text-button" onClick={() => onPanel("review")} type="button">Open review queue <Icon name="arrow-up-right" size={15} /></button></section>
-      <section className="transfer-card"><div className="signal-card__topline"><span className="phrase-card__label"><Icon name="compass" size={15} /> Transfer</span><span className="coming-soon">Next step</span></div><h3>Use today&apos;s shape somewhere new.</h3><p>Try the idea at a station instead of a cafe.</p><button className="text-button" onClick={() => onPanel("transfer")} type="button">Try a new situation <Icon name="arrow-up-right" size={15} /></button></section>
-      <div className="signal-rail__tip"><Icon name="spark" size={17} /><p><strong>One gentle nudge</strong> at a time keeps practice moving.</p></div>
+    <aside aria-label="Practice tools" className="practice-rail">
+      <div className="practice-rail__heading">
+        <div><Kicker>Keep nearby</Kicker><h2>Little language cards</h2></div>
+        <span className="practice-rail__spark" aria-hidden="true">✦</span>
+      </div>
+      <section className="language-card language-card--focus">
+        <div className="language-card__eyebrow"><span><StatusDot tone="warm" /> Today&apos;s shape</span><span>01</span></div>
+        <h3>{phraseTextFor(activePhraseId)}</h3>
+        <p>{phraseTranslationFor(activePhraseId)}</p>
+        <span className="language-card__detail">{activePhraseId === "phrase-because" ? "Connect an idea to a reason" : "A gentle request at a cafe"}</span>
+        <div className="language-card__actions"><button className="card-link" onClick={onReplay} type="button"><Icon name="play" size={14} /> Hear it</button><button className="card-link" onClick={() => onPractice(activePhraseId)} type="button">Practice <Icon name="arrow-up-right" size={14} /></button></div>
+      </section>
+      <section className="language-card language-card--bridge">
+        <div className="language-card__eyebrow"><span><Icon name="book-open" size={14} /> Phrase bridge</span><span>{state.profile.nativeLanguage === "hi" ? "HI" : state.profile.nativeLanguage.toUpperCase()}</span></div>
+        <h3>Keep the intention. Change the setting.</h3>
+        <p>Use the same polite shape when you ask for directions.</p>
+        <button className="card-link" onClick={() => onPanel("transfer")} type="button">Try a new situation <Icon name="arrow-up-right" size={14} /></button>
+      </section>
+      <section className="language-card language-card--review">
+        <div className="language-card__eyebrow"><span><Icon name="waveform" size={14} /> Practice focus</span><span className="queue-count">{state.reviewItems.length.toString().padStart(2, "0")}</span></div>
+        <h3>{topSkill ? `A little more ${topSkill.skillId}.` : "A little more confidence."}</h3>
+        <div className="focus-bars">{state.skills.slice(0, 3).map((skill) => <div className="focus-bar" key={skill.skillId}><span>{skill.skillId}</span><span className="focus-bar__track"><span style={{ width: `${Math.min(100, Math.max(14, skill.priorityScore * 18))}%` }} /></span></div>)}</div>
+        <button className="card-link" onClick={() => onPanel("review")} type="button">Open review queue <Icon name="arrow-up-right" size={14} /></button>
+      </section>
+      <p className="evidence-note"><Icon name="spark" size={16} /><span><strong>Small attempts count.</strong> Voice and text turns quietly shape your next practice.</span></p>
     </aside>
   );
 }
 
-function connectionState(state: VoiceState): ConnectionState {
-  if (state === "connected") return "connected";
-  if (state === "connecting") return "connecting";
-  if (state === "rate_limited") return "rate_limited";
+function connectionState(phase: LiveVoicePhase, notice?: string): ConnectionState {
+  if (phase === "connected") return "connected";
+  if (phase === "connecting" || phase === "ending") return "connecting";
+  if (phase === "text_fallback" && notice && /rate.?limit/i.test(notice)) return "rate_limited";
   return "offline";
+}
+
+function characterState(phase: LiveVoicePhase, isSpeaking: boolean, isListening: boolean): TutorCharacterState {
+  if (phase === "connected" && isSpeaking) return "speaking";
+  if (phase === "connected" && isListening) return "listening";
+  if (phase === "connected") return "connected";
+  return "idle";
 }
 
 export function StudioShell({
@@ -306,103 +420,36 @@ export function StudioShell({
   state: LearnerSession;
   onStateChange?: (state: LearnerSession) => void;
 }) {
-  const [voiceState, setVoiceState] = useState<VoiceState>("offline");
-  const [voiceNotice, setVoiceNotice] = useState("");
   const [panel, setPanel] = useState<Panel>("none");
   const [activePhraseId, setActivePhraseId] = useState("phrase-could-i");
   const [messages, setMessages] = useState<readonly ConversationMessage[]>(conversationFixture);
-  const seenVoiceEvents = useRef<Set<string>>(new Set());
+  const [replayNotice, setReplayNotice] = useState("");
   const initials = state.profile.displayName.slice(0, 2).toUpperCase() || "LF";
 
-  const conversation = useConversation({
-    onConnect: () => {
-      setVoiceState("connected");
-      setVoiceNotice("Live voice connected. Speak naturally; the tutor will keep the next correction small.");
+  const liveVoice = useLiveVoice({
+    itemId: activePhraseId,
+    onMessage: (message: LiveVoiceMessage) => {
+      const speaker: Speaker = message.role === "user" || message.source === "user" ? "learner" : "coach";
+      setMessages((current) => appendMessage(current, {
+        id: `voice-${String(message.event_id)}-${speaker}`,
+        speaker,
+        label: speaker === "learner" ? "You" : "Maya · coach",
+        body: message.message,
+        time: "now",
+      }));
     },
-    onDisconnect: (details) => {
-      setVoiceState("offline");
-      setVoiceNotice(details.reason === "error" ? "Live voice disconnected. Continue with text practice or reconnect." : "Voice session ended. Reconnect any time.");
-    },
-    onError: (message) => {
-      setVoiceState("offline");
-      setVoiceNotice(`Live voice unavailable: ${message}`);
-    },
-    onMessage: ({ event_id: eventId, message, role, source }) => {
-      const speaker: Speaker = role === "user" || source === "user" ? "learner" : "coach";
-      const id = `voice-${eventId}-${speaker}`;
-      if (seenVoiceEvents.current.has(id)) return;
-      seenVoiceEvents.current.add(id);
-      while (seenVoiceEvents.current.size > MAX_SEEN_VOICE_EVENTS) {
-        const oldest = seenVoiceEvents.current.values().next().value;
-        if (typeof oldest !== "string") break;
-        seenVoiceEvents.current.delete(oldest);
-      }
-      setMessages((current) => appendMessage(current, { id, speaker, label: speaker === "learner" ? "You" : "Maya · coach", body: message, time: "now" }));
-      if (speaker === "learner") {
-        void postEvidence(state, {
-          id: `evidence-voice-${state.sessionId}-${eventId}`,
-          itemId: "conversation-small-win",
-          skillId: "confidence",
-          type: "attempted",
-          expected: "Share a small win",
-          observed: message,
-          outcome: "uncertain",
-          confidence: 0.5,
-          source: "conversation",
-          context: { surface: "live_voice_transcript" },
-          createdAt: new Date().toISOString(),
-        });
-      }
-    },
+    state,
   });
-  const conversationStatus = useRef(conversation.status);
-
-  useEffect(() => {
-    conversationStatus.current = conversation.status;
-    if (conversation.status === "connected") setVoiceState("connected");
-    if (conversation.status === "connecting") setVoiceState("connecting");
-    if (conversation.status === "error" || conversation.status === "disconnected") setVoiceState("offline");
-  }, [conversation.status]);
-
-  useEffect(() => () => {
-    if (conversationStatus.current !== "disconnected") void conversation.endSession();
-  }, [conversation.endSession]);
-
-  async function toggleVoice() {
-    if (voiceState === "connecting") return;
-    if (conversation.status === "connected") {
-      conversation.endSession();
-      setVoiceState("offline");
-      setVoiceNotice("Voice session ended. Reconnect any time.");
-      return;
-    }
-
-    setVoiceState("connecting");
-    setVoiceNotice("Preparing the conversation line…");
-    const result = await connectVoice(state, activePhraseId);
-    if (result.mode !== "live" || result.fallback || !result.signedUrl) {
-      setVoiceState(result.fallbackDetails?.code === "rate_limited" ? "rate_limited" : "offline");
-      setVoiceNotice(result.fallbackDetails?.message ?? "Offline text practice is ready. Add live credentials for microphone sessions.");
-      return;
-    }
-
-    conversation.startSession(buildVoiceSessionOptions({
-      signedUrl: result.signedUrl,
-      learnerId: state.learnerId,
-      dynamicVariables: result.context?.dynamicVariables,
-    }));
-    setVoiceNotice("Microphone permission may be requested by your browser.");
-  }
+  const voiceNotice = replayNotice || liveVoice.notice;
+  const stateConnection = connectionState(liveVoice.phase, voiceNotice);
+  const tutorState = characterState(liveVoice.phase, liveVoice.isSpeaking, liveVoice.isListening);
 
   async function refreshState() {
     if (onStateChange) onStateChange(await refreshLearnerSession(state));
   }
 
   function addReply(text: string) {
-    if (conversation.status === "connected") {
-      conversation.sendUserMessage(text);
-      return;
-    }
+    if (liveVoice.phase === "connected" && liveVoice.sendText(text)) return;
     setMessages((current) => appendMessage(current, { id: clientMessageId("reply"), speaker: "learner", label: "You", body: text, time: "now" }));
     void postEvidence(state, {
       id: `evidence-text-${state.sessionId}-${Date.now()}`,
@@ -421,7 +468,7 @@ export function StudioShell({
 
   async function replayLatest() {
     const result = await replayPhrase(state, activePhraseId, phraseTextFor(activePhraseId));
-    setVoiceNotice(result.message);
+    setReplayNotice(result.message);
   }
 
   function openPractice(itemId: string) {
@@ -430,27 +477,25 @@ export function StudioShell({
   }
 
   return (
-    <main className="studio-layout" aria-label="Conversation studio">
-      <aside className="studio-sidebar">
-        <div className="sidebar-heading"><div className="brand-lockup" aria-label="LingoFlow home"><span className="brand-mark">L</span><span>LingoFlow</span></div><button aria-label="Open studio menu" className="icon-button icon-button--subtle" type="button"><Icon name="sliders" size={17} /></button></div>
-        <div className="sidebar-profile"><div className="avatar">{initials}</div><div><strong>{state.profile.displayName}&apos;s studio</strong><span>{state.profile.goal === "everyday" ? "Everyday conversation" : state.profile.goal === "work" ? "Work and meetings" : "Travel confidence"}</span></div><Icon name="chevron-down" size={15} /></div>
-        <nav aria-label="Studio navigation" className="studio-nav"><Kicker>Your space</Kicker><button className="studio-nav__item studio-nav__item--active" type="button"><Icon name="waveform" size={18} /><span>Practice studio</span><span className="nav-count">01</span></button><div className="studio-nav__item studio-nav__item--static"><Icon name="spark" size={18} /><span>Practice focus</span><span className="nav-count">{state.skills[0]?.skillId ?? "ready"}</span></div><button className="studio-nav__item" onClick={() => setPanel("review")} type="button"><Icon name="book-open" size={18} /><span>Review queue</span><span className="nav-count">{state.reviewItems.length.toString().padStart(2, "0")}</span></button></nav>
-        <div className="sidebar-bottom"><div className="streak-card"><div className="streak-card__copy"><Kicker>Keep the thread</Kicker><strong>3 day streak</strong></div><span className="streak-flame">✦</span></div><ConnectionStatus onReconnect={toggleVoice} state={connectionState(voiceState)} /><p className="sidebar-footer">Built for small, consistent wins.</p></div>
-      </aside>
-      <section className="studio-main">
-        <header className="studio-main__header"><div className="session-breadcrumb"><span>Practice studio</span><Icon name="arrow-up-right" size={13} /><strong>Small wins</strong></div><div className="studio-main__header-actions"><ConnectionStatus compact state={connectionState(voiceState)} /><Divider /><button aria-label="Session options" className="icon-button" type="button"><Icon name="more" /></button></div></header>
-        <div className="studio-main__body">
-          <div className="conversation-column">
-            <div className="session-intro"><div><Kicker>Wednesday · 10:42 AM</Kicker><h1>A little more like you.</h1><p>A five-minute conversation about the moments you&apos;re proud of.</p></div><div className="session-meta"><span><Icon name="clock" size={14} /> 04:12</span><span><Icon name="sound" size={14} /> {state.profile.personality === "patient" ? "Calm pace" : state.profile.personality === "energetic" ? "Bright pace" : "Clear pace"}</span></div></div>
-            <div className="conversation-lane" aria-label="Conversation with Maya"><div className="conversation-lane__line" aria-hidden="true" />{messages.map((message) => <article className={`message message--${message.speaker}`} key={message.id}><div className="message__avatar" aria-hidden="true">{message.speaker === "coach" ? <span>M</span> : <span>{initials}</span>}</div><div className="message__content"><div className="message__meta"><span>{message.label}</span><time>{message.time}</time></div><p><MessageBody message={message} /></p>{message.id === "reply" ? <div className="message__actions"><span className="message__signal"><StatusDot tone="active" /> Natural phrasing</span><button className="text-button" onClick={() => openPractice("phrase-could-i")} type="button">Practice this <Icon name="arrow-up-right" size={14} /></button></div> : null}</div></article>)}<div className="conversation-lane__next"><span className="conversation-lane__next-dot" /><span>{voiceState === "connected" ? "Maya is listening for your next thought" : "Your next thought can be written or spoken"}</span></div></div>
-            {panel === "practice" ? <PracticePanel itemId={activePhraseId} onClose={() => setPanel("none")} onSaved={refreshState} state={state} /> : null}
-            {panel === "review" ? <ReviewPanel onClose={() => setPanel("none")} onReview={openPractice} state={state} /> : null}
-            {panel === "transfer" ? <TransferPanel onClose={() => setPanel("none")} onSaved={refreshState} state={state} /> : null}
-            <ActionDock hint={voiceNotice || undefined} onReplay={() => void replayLatest()} onReply={addReply} onVoiceChange={() => void toggleVoice()} state={voiceState} />
-          </div>
-          <SignalRail onPanel={setPanel} onPractice={openPractice} state={state} />
-        </div>
-      </section>
+    <main aria-label="Conversation studio" className="voice-studio">
+      <header className="voice-studio__header">
+        <div className="voice-studio__brand"><span className="brand-mark">L</span><div><strong>LingoFlow</strong><span>voice studio</span></div></div>
+        <div className="voice-studio__session"><span className="voice-studio__session-dot" aria-hidden="true" /><span>Five-minute practice</span><strong>Small wins, spoken aloud</strong></div>
+        <div className="voice-studio__header-actions"><ConnectionStatus compact state={stateConnection} /><button aria-label="Open studio settings" className="icon-button" type="button"><Icon name="sliders" size={17} /></button><div aria-label={`${state.profile.displayName} profile`} className="voice-studio__avatar">{initials}</div></div>
+      </header>
+      <div className="voice-studio__body">
+        <section aria-labelledby="voice-stage-title" className="voice-stage">
+          <div className="voice-stage__topline"><div><Kicker>Today&apos;s conversation</Kicker><span className="voice-stage__time">Wednesday · 10:42 AM</span></div><span className={`voice-stage__status voice-stage__status--${liveVoice.phase}`} role="status"><StatusDot tone={liveVoice.phase === "connected" ? "active" : liveVoice.phase === "text_fallback" ? "warm" : "quiet"} />{voiceCopy(liveVoice.phase, liveVoice.isSpeaking, liveVoice.isListening).title}</span></div>
+          <div className="voice-stage__character"><div className="voice-stage__ambient" aria-hidden="true" /><TutorCharacter state={tutorState} /><p aria-live="polite" className="voice-stage__caption">{liveVoice.phase === "connected" ? (liveVoice.isSpeaking ? "Maya is sharing a thought" : liveVoice.isListening ? "Maya is listening for you" : "You're connected with Maya") : "Meet Maya, your patient conversation partner"}</p></div>
+          <div className="voice-stage__intro"><h1 id="voice-stage-title">A little more like you.</h1><p>Talk about a moment you&apos;re proud of. Maya will keep the next correction small.</p></div>
+          <LiveTranscript initials={initials} isListening={liveVoice.isListening} messages={messages} phase={liveVoice.phase} />
+          {panel === "practice" ? <PracticePanel itemId={activePhraseId} onClose={() => setPanel("none")} onSaved={refreshState} state={state} /> : null}
+          {panel === "review" ? <ReviewPanel onClose={() => setPanel("none")} onReview={openPractice} state={state} /> : null}
+          {panel === "transfer" ? <TransferPanel onClose={() => setPanel("none")} onSaved={refreshState} state={state} /> : null}
+          <VoiceControls isListening={liveVoice.isListening} isSpeaking={liveVoice.isSpeaking} notice={voiceNotice} onEnd={() => { setReplayNotice(""); void liveVoice.end(); }} onReplay={() => void replayLatest()} onReply={addReply} onVoiceChange={() => { setReplayNotice(""); void liveVoice.toggle(); }} phase={liveVoice.phase} />
+        </section>
+        <PracticeRail activePhraseId={activePhraseId} onPanel={setPanel} onPractice={openPractice} onReplay={() => void replayLatest()} state={state} />
+      </div>
     </main>
   );
 }

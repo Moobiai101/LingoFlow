@@ -1,11 +1,12 @@
 {
   "extends": "./tsconfig.base.json",
   "compilerOptions": {
-    "module": "NodeNext",
-    "moduleResolution": "NodeNext",
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
     "types": ["node"],
     "noEmit": true,
     "composite": true
   },
-  "include": ["test/**/*.ts", "apps/server/src/**/*.ts", "apps/web/src/components/outbox.ts", "apps/web/src/components/voice-session-options.ts", "apps/worker/src/validation.ts"]
+  "include": ["test/**/*.ts", "apps/server/src/**/*.ts", "apps/web/src/components/outbox.ts", "apps/web/src/components/voice-session-options.ts", "apps/web/src/components/learner-state.ts", "apps/web/src/components/live-voice.ts", "apps/worker/src/validation.ts"]
 }

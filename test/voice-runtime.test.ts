@@ -97,20 +97,36 @@ test("live connect without credentials returns a safe text fallback", async () =
   repository.close();
 });
 
-test("live connect fetches a signed URL and never returns the API key", async () => {
+test("live connect fetches a WebRTC conversation token and never returns the API key", async () => {
   const calls: Array<{ url: string; init?: RequestInit }> = [];
   const fetchImpl: typeof fetch = async (input, init) => {
     calls.push({ url: String(input), init });
-    return new Response(JSON.stringify({ signed_url: "wss://signed.example/session" }), { status: 200, headers: { "content-type": "application/json" } });
+    return new Response(JSON.stringify({ token: "conversation-token" }), { status: 200, headers: { "content-type": "application/json" } });
   };
   const { app, repository } = makeApp({ LINGOFLOW_MODE: "live", ELEVENLABS_API_KEY: "api-secret", ELEVENLABS_AGENT_ID: "agent-1" }, fetchImpl);
   const response = await app.inject({ method: "POST", url: "/api/voice/connect", payload: connectPayload() });
   assert.equal(response.statusCode, 200);
-  assert.equal(response.json().signedUrl, "wss://signed.example/session");
+  assert.equal(response.json().conversationToken, "conversation-token");
+  assert.equal(response.json().signedUrl, undefined);
   assert.equal(response.body.includes("api-secret"), false);
   assert.equal(calls.length, 1);
-  assert.match(calls[0]?.url ?? "", /agent_id=agent-1/);
+  assert.equal(calls[0]?.url, "https://api.elevenlabs.io/v1/convai/conversation/token?agent_id=agent-1");
   assert.equal((calls[0]?.init?.headers as Record<string, string>)["xi-api-key"], "api-secret");
+  await app.close();
+  repository.close();
+});
+
+test("live connect falls back safely when the conversation token endpoint fails", async () => {
+  const fetchImpl: typeof fetch = async () => new Response("provider rejected api-secret", { status: 401 });
+  const { app, repository } = makeApp({ LINGOFLOW_MODE: "live", ELEVENLABS_API_KEY: "api-secret", ELEVENLABS_AGENT_ID: "agent-1" }, fetchImpl);
+  const response = await app.inject({ method: "POST", url: "/api/voice/connect", payload: connectPayload() });
+  assert.equal(response.statusCode, 200);
+  const body = response.json();
+  assert.equal(body.status, "text_fallback");
+  assert.equal(body.fallback, true);
+  assert.equal(body.conversationToken, undefined);
+  assert.equal(JSON.stringify(body).includes("api-secret"), false);
+  assert.match(body.fallbackDetails.message, /text practice/i);
   await app.close();
   repository.close();
 });

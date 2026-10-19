@@ -50,6 +50,8 @@ export type VoiceConnectResponse = {
   readonly mode: "offline" | "live";
   readonly status: "ready" | "text_fallback";
   readonly fallback: boolean;
+  /** Short-lived browser authorization; never an ElevenLabs API key. */
+  readonly conversationToken?: string;
   readonly signedUrl?: string;
   readonly context?: {
     readonly systemPrompt?: string;

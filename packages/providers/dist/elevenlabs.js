@@ -240,16 +240,21 @@ export class ElevenLabsAgentProvider {
     async connect(input) {
         const credentials = requiredLive(this.options, true);
         const baseUrl = this.options.baseUrl ?? ELEVENLABS_DEFAULT_BASE_URL;
-        const response = await fetchWithRecovery(this.options, `${baseUrl}/v1/convai/conversation/get-signed-url?agent_id=${encodeURIComponent(credentials.agentId)}`, {
+        const response = await fetchWithRecovery(this.options, `${baseUrl}/v1/convai/conversation/token?agent_id=${encodeURIComponent(credentials.agentId)}`, {
             method: "GET",
             headers: { "xi-api-key": credentials.apiKey, accept: "application/json" },
         });
         if (!response.ok)
             throw new ProviderRequestError(response.status, await response.text());
         const data = asRecord(await response.json());
+        const conversationToken = firstString(data?.token, data?.conversation_token, data?.conversationToken);
+        if (conversationToken)
+            return { conversationToken, context: buildElevenLabsSessionContext(input) };
+        // Keep parsing the legacy field so an older ElevenLabs-compatible proxy can
+        // continue serving existing clients while the token path remains primary.
         const signedUrl = typeof data?.signed_url === "string" ? data.signed_url : undefined;
         if (!signedUrl)
-            throw new ProviderRequestError(502, "ElevenLabs did not return a signed_url");
+            throw new ProviderRequestError(502, "ElevenLabs did not return a conversation token");
         return { signedUrl, context: buildElevenLabsSessionContext(input) };
     }
     async replayPhrase(request) {

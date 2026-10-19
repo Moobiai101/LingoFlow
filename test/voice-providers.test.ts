@@ -41,23 +41,30 @@ test("ElevenLabs session context carries compact learner context and flash model
   assert.match(context.systemPrompt, /roast mode is off/i);
 });
 
-test("ElevenLabs retries transient provider responses before succeeding", async () => {
+test("ElevenLabs retries transient provider responses before returning a WebRTC conversation token", async () => {
   let calls = 0;
+  const urls: string[] = [];
   const provider = new ElevenLabsAgentProvider({
     mode: "live",
     apiKey: "api-secret",
     agentId: "agent-1",
     maxRetries: 2,
     retryDelayMs: 0,
-    fetchImpl: async () => {
+    fetchImpl: async (input) => {
       calls += 1;
+      urls.push(String(input));
       return calls === 1
         ? new Response("busy", { status: 503 })
-        : new Response(JSON.stringify({ signed_url: "wss://signed.example/session" }), { status: 200 });
+        : new Response(JSON.stringify({ token: "conversation-token" }), { status: 200 });
     },
   });
   const result = await provider.connect(sessionInput);
-  assert.equal(result.signedUrl, "wss://signed.example/session");
+  assert.equal(result.conversationToken, "conversation-token");
+  assert.equal(result.signedUrl, undefined);
+  assert.deepEqual(urls, [
+    "https://api.elevenlabs.io/v1/convai/conversation/token?agent_id=agent-1",
+    "https://api.elevenlabs.io/v1/convai/conversation/token?agent_id=agent-1",
+  ]);
   assert.equal(calls, 2);
 });
 

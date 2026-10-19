@@ -271,7 +271,14 @@ async function connectVoice(request: Request, env: Env): Promise<Response> {
   if (body.connect === false) return jsonResponse({ mode: "live", status: "ready", fallback: false, context });
   try {
     const handle = await provider.connect(input);
-    return jsonResponse({ mode: "live", status: "ready", fallback: false, context: handle.context, signedUrl: handle.signedUrl });
+    return jsonResponse({
+      mode: "live",
+      status: "ready",
+      fallback: false,
+      context: handle.context,
+      ...(handle.conversationToken ? { conversationToken: handle.conversationToken } : {}),
+      ...(handle.signedUrl ? { signedUrl: handle.signedUrl } : {}),
+    });
   } catch (error) {
     return jsonResponse({ mode: "live", status: "text_fallback", fallback: true, context, fallbackDetails: fallbackFor(error) });
   }

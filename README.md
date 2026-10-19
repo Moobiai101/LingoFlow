@@ -21,7 +21,7 @@ Copy `.env.example` to `.env` for local configuration. `.env` is ignored by Git.
 | `HOST` | `0.0.0.0` | Fastify bind address. |
 | `PORT` | `3000` | Fastify listen port. |
 | `LINGOFLOW_DB_PATH` | `data/lingoflow.sqlite` | SQLite database path; use `:memory:` for an ephemeral process. |
-| `ELEVENLABS_API_KEY` | unset | Server-only key for live signed URLs and phrase replay; never commit it. |
+| `ELEVENLABS_API_KEY` | unset | Server-only key for live WebRTC conversation tokens and phrase replay; never commit it. |
 | `ELEVENLABS_AGENT_ID` | unset | Required for live voice session connections. |
 | `ELEVENLABS_VOICE_ID` | unset | Required for live `eleven_v4` phrase replay. |
 | `ELEVENLABS_BASE_URL` | `https://api.elevenlabs.io` | Optional provider base URL for live adapters and local test doubles. |
@@ -180,12 +180,17 @@ npm start
 
 ## Provider configuration
 
-Offline mode is the default and is sufficient for every test and build. Live mode can configure ElevenLabs Agents for browser conversation through a server-issued signed URL and ElevenLabs TTS for phrase replay. The browser never receives the API key. The live client path is optional so the offline test command stays deterministic.
+Offline mode is the default and is sufficient for every test and build. Live mode configures ElevenLabs Agents for browser conversation through a server-issued short-lived WebRTC conversation token and ElevenLabs TTS for phrase replay. The browser never receives the API key. A signed WebSocket URL remains a compatibility fallback for older provider-compatible deployments. The live client path is optional so the offline test command stays deterministic.
 
 The deployed ElevenLabs Agent owns its prompt configuration. LingoFlow sends
 the learner/session context as supported dynamic variables and deliberately
 does not send a prompt override; the Agent rejects prompt overrides unless
-they are explicitly enabled in its configuration.
+they are explicitly enabled in its configuration. The browser uses the
+official WebRTC client path so microphone capture, interruption handling, and
+speaker playback stay inside the provider SDK rather than a hand-rolled
+WebSocket audio player. The live Agent is configured to wait patiently for a
+turn and to end after extended silence instead of repeatedly prompting a quiet
+microphone.
 
 The current practice drill is intentionally transcript-only in offline mode. It stores normalized assessment evidence and does not claim microphone or phoneme-level pronunciation precision.
 

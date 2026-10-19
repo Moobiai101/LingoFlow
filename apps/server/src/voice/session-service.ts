@@ -38,6 +38,7 @@ export interface VoiceConnectResult {
   readonly status: "ready" | "text_fallback";
   readonly fallback: boolean;
   readonly context: VoiceSessionContext;
+  readonly conversationToken?: string;
   readonly signedUrl?: string;
   readonly fallbackDetails?: VoiceFallback;
 }
@@ -167,6 +168,7 @@ export class VoiceSessionService {
       status: "ready",
       fallback: false,
       context: handle.context,
+      ...(handle.conversationToken ? { conversationToken: handle.conversationToken } : {}),
       ...(handle.signedUrl ? { signedUrl: handle.signedUrl } : {}),
     };
   }
